@@ -1419,49 +1419,99 @@ export function initBot(): TelegramBot {
       if (data.startsWith("approve_deposit_")) {
         const depositId = parseInt(data.split("_")[2]);
         const deposit = await storage.getDeposit(depositId);
-        if (deposit && deposit.status === "pending") {
-          await storage.updateDepositStatus(depositId, "approved", (await storage.getUserByTelegramId(telegramId))?.id);
-          await storage.addDeposit(deposit.userId, deposit.amount);
-          await storage.createTransaction({
-            userId: deposit.userId,
-            type: "deposit",
-            amount: deposit.amount,
-            description: `إيداع ${deposit.method}`,
-            relatedId: deposit.id,
-          });
+        if (!deposit || deposit.status !== "pending") {
+          try {
+            await bot.answerCallbackQuery(query.id, { text: "⚠️ تم معالجة هذا الإيداع مسبقاً", show_alert: true });
+          } catch {}
+          return;
+        }
+        await storage.updateDepositStatus(depositId, "approved", (await storage.getUserByTelegramId(telegramId))?.id);
+        await storage.addDeposit(deposit.userId, deposit.amount);
+        await storage.createTransaction({
+          userId: deposit.userId,
+          type: "deposit",
+          amount: deposit.amount,
+          description: `إيداع ${deposit.method}`,
+          relatedId: deposit.id,
+        });
 
-          const user = await storage.getUser(deposit.userId);
-          if (user) {
-            await bot.sendMessage(
-              parseInt(user.telegramId),
-              `✅ *تم تأكيد الإيداع*\n\nتم إضافة ${formatNumber(deposit.amount)} IQD إلى رصيدك.\nرصيدك الحالي: ${formatNumber(parseFloat(user.balance) + parseFloat(deposit.amount))} IQD`,
-              { parse_mode: "Markdown" }
-            );
-          }
-          await bot.editMessageText(
-            `✅ *تم تأكيد الإيداع #${depositId}*\nبواسطة: ${query.from.first_name}`,
-            { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" }
+        const user = await storage.getUser(deposit.userId);
+        if (user) {
+          await bot.sendMessage(
+            parseInt(user.telegramId),
+            `✅ *تم تأكيد الإيداع*\n\nتم إضافة ${formatNumber(deposit.amount)} IQD إلى رصيدك.\nرصيدك الحالي: ${formatNumber(parseFloat(user.balance) + parseFloat(deposit.amount))} IQD`,
+            { parse_mode: "Markdown" }
           );
+        }
+
+        const adminUsername = query.from.username ? "@" + query.from.username : query.from.first_name;
+        const depositUser = user || await storage.getUser(deposit.userId);
+        const confirmedCaption =
+          `💰 تم تأكيد إيداع جديد #${depositId}\n\n` +
+          `👤 الاسم: ${depositUser?.firstName || ""} ${depositUser?.lastName || ""}\n` +
+          `🆔 الآيدي: ${depositUser?.telegramId || ""}\n` +
+          `📱 اليوزر: ${depositUser?.username ? "@" + depositUser.username : "غير محدد"}\n` +
+          `💵 المبلغ: ${formatNumber(deposit.amount)} IQD\n` +
+          `💳 الطريقة: ${deposit.method}\n\n` +
+          `✅ تم التأكيد من قبل: ${adminUsername}`;
+
+        try {
+          await bot.editMessageCaption(confirmedCaption, {
+            chat_id: chatId,
+            message_id: messageId,
+          });
+        } catch {
+          try {
+            await bot.editMessageText(confirmedCaption, {
+              chat_id: chatId,
+              message_id: messageId,
+            });
+          } catch {}
         }
       }
 
       if (data.startsWith("reject_deposit_")) {
         const depositId = parseInt(data.split("_")[2]);
         const deposit = await storage.getDeposit(depositId);
-        if (deposit && deposit.status === "pending") {
-          await storage.updateDepositStatus(depositId, "rejected");
-          const user = await storage.getUser(deposit.userId);
-          if (user) {
-            await bot.sendMessage(
-              parseInt(user.telegramId),
-              `❌ *تم رفض عملية الإيداع*\n\nيرجى مراسلة الأدمن ${ADMIN_USERNAME}`,
-              { parse_mode: "Markdown" }
-            );
-          }
-          await bot.editMessageText(
-            `❌ *تم رفض الإيداع #${depositId}*\nبواسطة: ${query.from.first_name}`,
-            { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" }
+        if (!deposit || deposit.status !== "pending") {
+          try {
+            await bot.answerCallbackQuery(query.id, { text: "⚠️ تم معالجة هذا الإيداع مسبقاً", show_alert: true });
+          } catch {}
+          return;
+        }
+        await storage.updateDepositStatus(depositId, "rejected");
+        const user = await storage.getUser(deposit.userId);
+        if (user) {
+          await bot.sendMessage(
+            parseInt(user.telegramId),
+            `❌ *تم رفض عملية الإيداع*\n\nيرجى مراسلة الأدمن ${ADMIN_USERNAME}`,
+            { parse_mode: "Markdown" }
           );
+        }
+
+        const adminUsername = query.from.username ? "@" + query.from.username : query.from.first_name;
+        const depositUser = user || await storage.getUser(deposit.userId);
+        const rejectedCaption =
+          `💰 تم رفض إيداع #${depositId}\n\n` +
+          `👤 الاسم: ${depositUser?.firstName || ""} ${depositUser?.lastName || ""}\n` +
+          `🆔 الآيدي: ${depositUser?.telegramId || ""}\n` +
+          `📱 اليوزر: ${depositUser?.username ? "@" + depositUser.username : "غير محدد"}\n` +
+          `💵 المبلغ: ${formatNumber(deposit.amount)} IQD\n` +
+          `💳 الطريقة: ${deposit.method}\n\n` +
+          `❌ تم الرفض من قبل: ${adminUsername}`;
+
+        try {
+          await bot.editMessageCaption(rejectedCaption, {
+            chat_id: chatId,
+            message_id: messageId,
+          });
+        } catch {
+          try {
+            await bot.editMessageText(rejectedCaption, {
+              chat_id: chatId,
+              message_id: messageId,
+            });
+          } catch {}
         }
       }
 
