@@ -492,7 +492,8 @@ async function showAdminPanel(chatId: number, messageId?: number) {
   const buttons = [
     [{ text: "📊 الإحصائيات", callback_data: "admin_stats" }],
     [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories" }],
-    [{ text: "🔧 إضافة/تعديل خدمة", callback_data: "admin_add_service" }],
+    [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service" }],
+    [{ text: "✏️ تعديل خدمة", callback_data: "admin_edit_services" }],
     [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin" }],
     [{ text: "👑 الأدمنية", callback_data: "admin_admins" }],
     [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups" }],
@@ -522,7 +523,8 @@ async function showAdminStats(chatId: number, messageId?: number) {
   const allStats = await storage.getOrderStats();
   const kd1sStats = await storage.getOrderStatsByProvider("kd1s");
   const amazingStats = await storage.getOrderStatsByProvider("amazing");
-  const customStats = await storage.getOrderStatsByProvider("custom");
+  const customSmmStats = await storage.getOrderStatsByCategoryType("smm");
+  const subscriptionStats = await storage.getOrderStatsByCategoryType("subscriptions");
 
   const allUsers = await storage.getAllUsers();
   const totalBalance = allUsers.reduce((sum, u) => sum + parseFloat(u.balance), 0);
@@ -544,10 +546,14 @@ async function showAdminStats(chatId: number, messageId?: number) {
     `الطلبات: ${amazingStats.total}\n` +
     `المبالغ: ${formatNumber(amazingStats.totalAmount)} IQD\n` +
     `الأرباح: ${formatNumber(amazingStats.totalProfit)} IQD\n\n` +
-    `🛠 *خدمات خاصة:*\n` +
-    `الطلبات: ${customStats.total}\n` +
-    `المبالغ: ${formatNumber(customStats.totalAmount)} IQD\n` +
-    `الأرباح: ${formatNumber(customStats.totalProfit)} IQD`;
+    `🛠 *خدمات خاصة (سوشل ميديا):*\n` +
+    `الطلبات: ${customSmmStats.total}\n` +
+    `المبالغ: ${formatNumber(customSmmStats.totalAmount)} IQD\n` +
+    `الأرباح: ${formatNumber(customSmmStats.totalProfit)} IQD\n\n` +
+    `📺 *طلبات الاشتراكات:*\n` +
+    `الطلبات: ${subscriptionStats.total}\n` +
+    `المبالغ: ${formatNumber(subscriptionStats.totalAmount)} IQD\n` +
+    `الأرباح: ${formatNumber(subscriptionStats.totalProfit)} IQD`;
 
   const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
   if (messageId) {
@@ -606,10 +612,49 @@ async function showAdminCategories(chatId: number, messageId?: number) {
   }
 }
 
+async function showAdminEditServices(chatId: number, messageId?: number) {
+  const cats = await storage.getCategories();
+  const activeCats = cats.filter(c => c.isActive);
+
+  if (activeCats.length === 0) {
+    const text = "✏️ *تعديل الخدمات*\n\nلا توجد أقسام حالياً.";
+    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+    if (messageId) {
+      return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+    }
+    return bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+
+  const smmCats = activeCats.filter(c => c.type === "smm");
+  const subCats = activeCats.filter(c => c.type === "subscriptions");
+
+  let text = "✏️ *تعديل الخدمات*\n\nاختر القسم لتعديل خدماته:";
+
+  const buttons: any[][] = [];
+  if (smmCats.length > 0) {
+    smmCats.forEach(c => {
+      buttons.push([{ text: `📱 ${c.name}`, callback_data: `editcat_${c.slug}` }]);
+    });
+  }
+  if (subCats.length > 0) {
+    subCats.forEach(c => {
+      buttons.push([{ text: `📺 ${c.name}`, callback_data: `editcat_${c.slug}` }]);
+    });
+  }
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+
+  const keyboard = { inline_keyboard: buttons };
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+}
+
 async function showAdminAddService(chatId: number, telegramId: string, messageId?: number) {
   setState(telegramId, { step: "admin_select_provider" });
 
-  const addText = "🔧 *إضافة خدمة جديدة*\n\nاختر نوع الخدمة:";
+  const addText = "➕ *إضافة خدمة جديدة*\n\nاختر نوع الخدمة:";
   const addKeyboard = {
     inline_keyboard: [
       [
@@ -1050,6 +1095,7 @@ export function initBot(): TelegramBot {
       if (data === "admin_stats") return showAdminStats(chatId, messageId);
       if (data === "admin_categories") return showAdminCategories(chatId, messageId);
       if (data === "admin_add_service") return showAdminAddService(chatId, telegramId, messageId);
+      if (data === "admin_edit_services") return showAdminEditServices(chatId, messageId);
       if (data === "admin_margin") return showAdminMargin(chatId, messageId);
       if (data === "admin_admins") return showAdminAdmins(chatId, messageId);
 
@@ -1163,6 +1209,13 @@ export function initBot(): TelegramBot {
           await bot.editMessageText(`✅ تم إزالة الأدمن ${user.firstName || user.telegramId}`, { chat_id: chatId, message_id: messageId });
           return showAdminAdmins(chatId);
         }
+      }
+
+      // Edit category services (from admin edit services menu)
+      if (data.startsWith("editcat_")) {
+        const slug = data.replace("editcat_", "");
+        await showEditCategory(chatId, slug, telegramId);
+        return;
       }
 
       // Edit service

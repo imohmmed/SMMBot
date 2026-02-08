@@ -12,7 +12,8 @@ interface Stats {
   orders: { total: number; totalAmount: string; totalProfit: string };
   kd1s: { total: number; totalAmount: string; totalProfit: string };
   amazing: { total: number; totalAmount: string; totalProfit: string };
-  custom: { total: number; totalAmount: string; totalProfit: string };
+  customSmm: { total: number; totalAmount: string; totalProfit: string };
+  subscriptions: { total: number; totalAmount: string; totalProfit: string };
 }
 
 function formatNumber(num: number | string) {
@@ -144,10 +145,11 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <ProviderCard name="kd1s.com" stats={stats.kd1s || { total: 0, totalAmount: "0", totalProfit: "0" }} />
         <ProviderCard name="amazingsmm.com" stats={stats.amazing || { total: 0, totalAmount: "0", totalProfit: "0" }} />
-        <ProviderCard name="خدمات خاصة" stats={stats.custom || { total: 0, totalAmount: "0", totalProfit: "0" }} />
+        <ProviderCard name="خدمات خاصة" stats={stats.customSmm || { total: 0, totalAmount: "0", totalProfit: "0" }} />
+        <ProviderCard name="الاشتراكات" stats={stats.subscriptions || { total: 0, totalAmount: "0", totalProfit: "0" }} />
       </div>
 
       <Card>

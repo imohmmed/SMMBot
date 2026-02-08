@@ -25,7 +25,8 @@ export async function registerRoutes(
       const orderStats = await storage.getOrderStats();
       const kd1sStats = await storage.getOrderStatsByProvider("kd1s");
       const amazingStats = await storage.getOrderStatsByProvider("amazing");
-      const customStats = await storage.getOrderStatsByProvider("custom");
+      const customSmmStats = await storage.getOrderStatsByCategoryType("smm");
+      const subscriptionStats = await storage.getOrderStatsByCategoryType("subscriptions");
       const allUsers = await storage.getAllUsers();
       const totalBalance = allUsers.reduce((sum, u) => sum + parseFloat(u.balance), 0);
       const totalDeposits = allUsers.reduce((sum, u) => sum + parseFloat(u.totalDeposits), 0);
@@ -39,7 +40,8 @@ export async function registerRoutes(
         orders: orderStats,
         kd1s: kd1sStats,
         amazing: amazingStats,
-        custom: customStats,
+        customSmm: customSmmStats,
+        subscriptions: subscriptionStats,
       });
     } catch (error) {
       res.status(500).json({ message: "Error fetching stats" });

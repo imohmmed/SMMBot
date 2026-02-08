@@ -51,6 +51,7 @@ export interface IStorage {
   updateOrderStatus(id: number, status: string, providerOrderId?: string): Promise<void>;
   getOrderStats(): Promise<{ total: number; totalAmount: string; totalProfit: string }>;
   getOrderStatsByProvider(provider: string): Promise<{ total: number; totalAmount: string; totalProfit: string }>;
+  getOrderStatsByCategoryType(categoryType: string): Promise<{ total: number; totalAmount: string; totalProfit: string }>;
 
   // Deposits
   getDeposit(id: number): Promise<Deposit | undefined>;
@@ -238,6 +239,18 @@ export class DatabaseStorage implements IStorage {
       totalAmount: sql<string>`COALESCE(SUM(${orders.amount}::numeric), 0)::text`,
       totalProfit: sql<string>`COALESCE(SUM(${orders.profit}::numeric), 0)::text`
     }).from(orders).where(eq(orders.provider, provider));
+    return result;
+  }
+
+  async getOrderStatsByCategoryType(categoryType: string): Promise<{ total: number; totalAmount: string; totalProfit: string }> {
+    const [result] = await db.select({
+      total: count(),
+      totalAmount: sql<string>`COALESCE(SUM(${orders.amount}::numeric), 0)::text`,
+      totalProfit: sql<string>`COALESCE(SUM(${orders.profit}::numeric), 0)::text`
+    }).from(orders)
+      .innerJoin(services, eq(orders.serviceId, services.id))
+      .innerJoin(categories, eq(services.categoryId, categories.id))
+      .where(eq(categories.type, categoryType));
     return result;
   }
 
