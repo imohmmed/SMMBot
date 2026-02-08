@@ -527,7 +527,7 @@ async function showAdminPanel(chatId: number, messageId?: number) {
     [{ text: "📊 الإحصائيات", callback_data: "admin_stats" }],
     [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories" }],
     [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service" }],
-    [{ text: "✏️ تعديل خدمة", callback_data: "admin_edit_services" }],
+    [{ text: "✏️ تعديل خدمة", callback_data: "admin_edit_services" }, { text: "🗑 حذف خدمة", callback_data: "admin_delete_services" }],
     [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin" }],
     [{ text: "👑 الأدمنية", callback_data: "admin_admins" }],
     [{ text: "📢 الإذاعة", callback_data: "admin_broadcast" }],
@@ -683,6 +683,71 @@ async function showAdminEditServices(chatId: number, messageId?: number) {
     await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
   } else {
     await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+}
+
+async function showAdminDeleteServices(chatId: number, messageId?: number) {
+  const cats = await storage.getCategories();
+  const activeCats = cats.filter(c => c.isActive);
+
+  if (activeCats.length === 0) {
+    const text = "🗑 *حذف خدمة*\n\nلا توجد أقسام حالياً.";
+    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+    if (messageId) {
+      return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+    }
+    return bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+
+  const smmCats = activeCats.filter(c => c.type === "smm");
+  const subCats = activeCats.filter(c => c.type === "subscriptions");
+
+  const buttons: any[][] = [];
+  smmCats.forEach(c => {
+    buttons.push([{ text: `📱 ${c.name}`, callback_data: `delcat_${c.slug}` }]);
+  });
+  subCats.forEach(c => {
+    buttons.push([{ text: `📺 ${c.name}`, callback_data: `delcat_${c.slug}` }]);
+  });
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+
+  const text = "🗑 *حذف خدمة*\n\nاختر القسم:";
+  const keyboard = { inline_keyboard: buttons };
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+}
+
+async function showDeleteCategoryServices(chatId: number, slug: string, messageId?: number) {
+  const cat = await storage.getCategoryBySlug(slug);
+  if (!cat) {
+    return bot.sendMessage(chatId, "❌ القسم غير موجود.");
+  }
+
+  const svcs = await storage.getServicesByCategory(cat.id);
+
+  if (svcs.length === 0) {
+    const text = `📂 *${cat.name}*\n\nلا توجد خدمات في هذا القسم.`;
+    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_delete_services" }]] };
+    if (messageId) {
+      return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+    }
+    return bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+
+  let text = `🗑 *حذف خدمة من ${cat.name}:*\n\nاختر الخدمة لحذفها:`;
+
+  const buttons = svcs.map((s) => [
+    { text: `🗑 ${s.name}`, callback_data: `del_svc_${s.id}` },
+  ]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_delete_services" }]);
+
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: { inline_keyboard: buttons } });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: { inline_keyboard: buttons } });
   }
 }
 
@@ -1367,6 +1432,7 @@ export function initBot(): TelegramBot {
       if (data === "admin_categories") return showAdminCategories(chatId, messageId);
       if (data === "admin_add_service") return showAdminAddService(chatId, telegramId, messageId);
       if (data === "admin_edit_services") return showAdminEditServices(chatId, messageId);
+      if (data === "admin_delete_services") return showAdminDeleteServices(chatId, messageId);
       if (data === "admin_margin") return showAdminMargin(chatId, messageId);
       if (data === "admin_admins") return showAdminAdmins(chatId, messageId);
 
@@ -1585,6 +1651,58 @@ export function initBot(): TelegramBot {
       if (data.startsWith("editcat_")) {
         const slug = data.replace("editcat_", "");
         await showEditCategory(chatId, slug, telegramId);
+        return;
+      }
+
+      // Delete service category selection
+      if (data.startsWith("delcat_")) {
+        const slug = data.replace("delcat_", "");
+        await showDeleteCategoryServices(chatId, slug, messageId);
+        return;
+      }
+
+      // Delete service - show confirmation
+      if (data.startsWith("del_svc_")) {
+        const svcId = parseInt(data.split("_")[2]);
+        const svc = await storage.getService(svcId);
+        if (svc) {
+          return bot.editMessageText(
+            `⚠️ *هل أنت متأكد من حذف هذه الخدمة؟*\n\n` +
+            `📋 ${svc.name}\n` +
+            `📦 عدد الطلبات: ${svc.totalOrders}\n\n` +
+            `هذا الإجراء لا يمكن التراجع عنه!`,
+            {
+              chat_id: chatId,
+              message_id: messageId,
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "✅ نعم، احذف", callback_data: `confirm_del_svc_${svcId}` }],
+                  [{ text: "❌ لا، رجوع", callback_data: "admin_delete_services" }],
+                ],
+              },
+            }
+          );
+        }
+      }
+
+      // Confirm delete service
+      if (data.startsWith("confirm_del_svc_")) {
+        const svcId = parseInt(data.split("_")[3]);
+        const svc = await storage.getService(svcId);
+        if (svc) {
+          await storage.deleteService(svcId);
+          await bot.editMessageText(
+            `✅ تم حذف الخدمة "${svc.name}" بنجاح!`,
+            {
+              chat_id: chatId,
+              message_id: messageId,
+              reply_markup: {
+                inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_delete_services" }]],
+              },
+            }
+          );
+        }
         return;
       }
 
