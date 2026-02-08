@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import UsersPage from "@/pages/users-page";
 import OrdersPage from "@/pages/orders-page";
 import ServicesPage from "@/pages/services-page";
+import BroadcastPage from "@/pages/broadcast-page";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/users" component={UsersPage} />
       <Route path="/orders" component={OrdersPage} />
       <Route path="/services" component={ServicesPage} />
+      <Route path="/broadcast" component={BroadcastPage} />
       <Route component={NotFound} />
     </Switch>
   );

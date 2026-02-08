@@ -27,6 +27,7 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - `client/src/pages/users-page.tsx` - Users list
 - `client/src/pages/orders-page.tsx` - Orders table
 - `client/src/pages/services-page.tsx` - Services grid
+- `client/src/pages/broadcast-page.tsx` - Broadcast messages to all users
 
 ## Bot Commands
 - `/start` - Main menu

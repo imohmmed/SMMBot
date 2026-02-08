@@ -10,13 +10,14 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Users, ShoppingCart, Settings, Bot } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Settings, Bot, Megaphone } from "lucide-react";
 
 const menuItems = [
   { title: "لوحة التحكم", url: "/", icon: LayoutDashboard },
   { title: "الأعضاء", url: "/users", icon: Users },
   { title: "الطلبات", url: "/orders", icon: ShoppingCart },
   { title: "الخدمات", url: "/services", icon: Settings },
+  { title: "الإذاعة", url: "/broadcast", icon: Megaphone },
 ];
 
 export function AppSidebar() {

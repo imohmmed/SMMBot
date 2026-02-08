@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { initBot } from "./bot";
+import { initBot, getBot } from "./bot";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -103,6 +103,63 @@ export async function registerRoutes(
       res.json(methods);
     } catch (error) {
       res.status(500).json({ message: "Error fetching payment methods" });
+    }
+  });
+
+  app.post("/api/broadcast", async (req, res) => {
+    try {
+      const { message, imageUrl, buttonText, buttonUrl } = req.body;
+
+      if (!message && !imageUrl) {
+        return res.status(400).json({ message: "يجب إدخال نص أو صورة على الأقل" });
+      }
+
+      if ((buttonText && !buttonUrl) || (!buttonText && buttonUrl)) {
+        return res.status(400).json({ message: "يجب إدخال نص الزر والرابط معاً" });
+      }
+
+      if (buttonUrl && !buttonUrl.startsWith("http")) {
+        return res.status(400).json({ message: "الرابط يجب أن يبدأ بـ http أو https" });
+      }
+
+      const bot = getBot();
+      if (!bot) {
+        return res.status(500).json({ message: "البوت غير متاح حالياً" });
+      }
+
+      const users = await storage.getAllUsers();
+      let sent = 0;
+      let failed = 0;
+
+      const inlineKeyboard = buttonText && buttonUrl
+        ? { reply_markup: { inline_keyboard: [[{ text: buttonText, url: buttonUrl }]] } }
+        : {};
+
+      for (const user of users) {
+        try {
+          if (imageUrl) {
+            await bot.sendPhoto(user.telegramId, imageUrl, {
+              caption: message || "",
+              parse_mode: "Markdown",
+              ...inlineKeyboard,
+            });
+          } else {
+            await bot.sendMessage(user.telegramId, message, {
+              parse_mode: "Markdown",
+              ...inlineKeyboard,
+            });
+          }
+          sent++;
+          await new Promise(r => setTimeout(r, 50));
+        } catch (e) {
+          failed++;
+        }
+      }
+
+      res.json({ sent, failed, total: users.length });
+    } catch (error) {
+      console.error("Broadcast error:", error);
+      res.status(500).json({ message: "حدث خطأ أثناء الإرسال" });
     }
   });
 

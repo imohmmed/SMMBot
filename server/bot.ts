@@ -713,6 +713,10 @@ async function showEditCategory(chatId: number, slug: string, telegramId: string
   });
 }
 
+export function getBot(): TelegramBot {
+  return bot;
+}
+
 export function initBot(): TelegramBot {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
