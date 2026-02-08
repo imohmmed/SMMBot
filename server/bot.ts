@@ -1099,6 +1099,17 @@ export function initBot(): TelegramBot {
 
           if (notificationGroupId) {
             const providerLabel = svc.serviceType === "custom" ? "خدمة خاصة" : (svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com");
+            const groupButtons: any[][] = [
+              [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
+            ];
+            if (svc.serviceType === "custom") {
+              groupButtons.push([
+                { text: "✅ تأكيد اكمال الطلب", callback_data: `complete_order_${order.id}` },
+              ]);
+              groupButtons.push([
+                { text: "❌ تأكيد الغاء الطلب", callback_data: `cancel_order_${order.id}` },
+              ]);
+            }
             await bot.sendMessage(
               notificationGroupId,
               `📦 طلب جديد #${displayId}\n\n` +
@@ -1112,9 +1123,7 @@ export function initBot(): TelegramBot {
               `🌐 النوع: ${providerLabel}`,
               {
                 reply_markup: {
-                  inline_keyboard: [
-                    [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
-                  ],
+                  inline_keyboard: groupButtons,
                 },
               }
             );
@@ -1216,6 +1225,8 @@ export function initBot(): TelegramBot {
               reply_markup: {
                 inline_keyboard: [
                   [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
+                  [{ text: "✅ تأكيد اكمال الطلب", callback_data: `complete_order_${order.id}` }],
+                  [{ text: "❌ تأكيد الغاء الطلب", callback_data: `cancel_order_${order.id}` }],
                 ],
               },
             }
@@ -1587,6 +1598,91 @@ export function initBot(): TelegramBot {
             { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" }
           );
         }
+      }
+
+      // Complete custom/subscription order
+      if (data.startsWith("complete_order_")) {
+        const orderId = parseInt(data.split("_")[2]);
+        const order = await storage.getOrder(orderId);
+        if (!order) return;
+
+        if (order.status === "completed") {
+          try { await bot.answerCallbackQuery(query.id, { text: "✅ تم اكمال هذا الطلب مسبقاً", show_alert: true }); } catch {}
+          return;
+        }
+        if (order.status === "cancelled" || order.status === "refunded") {
+          try { await bot.answerCallbackQuery(query.id, { text: "❌ هذا الطلب ملغي مسبقاً", show_alert: true }); } catch {}
+          return;
+        }
+
+        await storage.updateOrderStatus(order.id, "completed");
+        const displayId = getOrderDisplayId(order);
+
+        // Update the group message to show completed status
+        const currentText = query.message?.text || "";
+        await bot.editMessageText(
+          currentText + `\n\n✅ تم اكمال الطلب`,
+          { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }
+        );
+
+        // Notify the user
+        const orderUser = await storage.getUser(order.userId);
+        if (orderUser) {
+          try {
+            await bot.sendMessage(
+              parseInt(orderUser.telegramId),
+              `✅ تم اكمال طلبك #${displayId} بنجاح!`,
+            );
+          } catch {}
+        }
+        return;
+      }
+
+      // Cancel custom/subscription order with refund
+      if (data.startsWith("cancel_order_")) {
+        const orderId = parseInt(data.split("_")[2]);
+        const order = await storage.getOrder(orderId);
+        if (!order) return;
+
+        if (order.status === "cancelled" || order.status === "refunded") {
+          try { await bot.answerCallbackQuery(query.id, { text: "❌ تم الغاء هذا الطلب مسبقاً", show_alert: true }); } catch {}
+          return;
+        }
+        if (order.status === "completed") {
+          try { await bot.answerCallbackQuery(query.id, { text: "✅ هذا الطلب مكتمل مسبقاً", show_alert: true }); } catch {}
+          return;
+        }
+
+        await storage.updateOrderStatus(order.id, "cancelled");
+        const displayId = getOrderDisplayId(order);
+
+        // Refund the user
+        const orderUser = await storage.getUser(order.userId);
+        if (orderUser) {
+          await storage.updateUserBalance(orderUser.id, order.amount);
+          await storage.createTransaction({
+            userId: orderUser.id,
+            type: "refund",
+            amount: order.amount,
+            description: `استرجاع طلب #${displayId}`,
+            relatedId: order.id,
+          });
+
+          try {
+            await bot.sendMessage(
+              parseInt(orderUser.telegramId),
+              `🔄 تم الغاء طلبك #${displayId}\n\nتم إرجاع المبلغ ${formatNumber(order.amount)} IQD إلى رصيدك.`,
+            );
+          } catch {}
+        }
+
+        // Update the group message
+        const currentText = query.message?.text || "";
+        await bot.editMessageText(
+          currentText + `\n\n❌ تم الغاء الطلب واسترجاع المبلغ`,
+          { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }
+        );
+        return;
       }
 
       // Deposit approval
