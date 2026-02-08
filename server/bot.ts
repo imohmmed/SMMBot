@@ -64,28 +64,39 @@ function calculatePrice(rate: string, quantity: number, margin: number): number 
   return basePrice * (1 + margin / 100);
 }
 
-async function sendMainMenu(chatId: number) {
+async function sendMainMenu(chatId: number, messageId?: number) {
+  const text = "🌟 *مرحباً بك في بوت خدمات السوشل ميديا*\n\nاختر من القائمة أدناه:";
   const keyboard = {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "📋 الخدمات", callback_data: "services" }],
-        [{ text: "👤 معلومات حسابك", callback_data: "account_info" }, { text: "💰 شحن حسابك", callback_data: "deposit" }],
-        [{ text: "📦 طلباتي", callback_data: "my_orders" }],
-      ],
-    },
+    inline_keyboard: [
+      [{ text: "📋 الخدمات", callback_data: "services" }],
+      [{ text: "👤 معلومات حسابك", callback_data: "account_info" }, { text: "💰 شحن حسابك", callback_data: "deposit" }],
+      [{ text: "📦 طلباتي", callback_data: "my_orders" }],
+    ],
   };
 
-  await bot.sendMessage(
-    chatId,
-    "🌟 *مرحباً بك في بوت خدمات السوشل ميديا*\n\nاختر من القائمة أدناه:",
-    { parse_mode: "Markdown", ...keyboard }
-  );
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showServices(chatId: number) {
+async function showServices(chatId: number, messageId?: number) {
   const cats = await storage.getActiveCategories();
   if (cats.length === 0) {
-    return bot.sendMessage(chatId, "❌ لا توجد خدمات متاحة حالياً.");
+    const text = "❌ لا توجد خدمات متاحة حالياً.";
+    if (messageId) {
+      return bot.editMessageText(text, { chat_id: chatId, message_id: messageId });
+    }
+    return bot.sendMessage(chatId, text);
   }
 
   const buttons = cats.map((cat) => [
@@ -93,19 +104,35 @@ async function showServices(chatId: number) {
   ]);
   buttons.push([{ text: "🔙 رجوع", callback_data: "main_menu" }]);
 
-  await bot.sendMessage(chatId, "📋 *اختر القسم:*", {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const text = "📋 *اختر القسم:*";
+  const keyboard = { inline_keyboard: buttons };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showCategoryServices(chatId: number, categoryId: number) {
+async function showCategoryServices(chatId: number, categoryId: number, messageId?: number) {
   const margin = await getProfitMargin();
   const svcs = await storage.getActiveServicesByCategory(categoryId);
   const cat = await storage.getCategory(categoryId);
 
   if (svcs.length === 0) {
-    return bot.sendMessage(chatId, "❌ لا توجد خدمات في هذا القسم حالياً.");
+    const text = "❌ لا توجد خدمات في هذا القسم حالياً.";
+    if (messageId) {
+      return bot.editMessageText(text, { chat_id: chatId, message_id: messageId });
+    }
+    return bot.sendMessage(chatId, text);
   }
 
   const buttons = svcs.map((svc) => [
@@ -113,15 +140,31 @@ async function showCategoryServices(chatId: number, categoryId: number) {
   ]);
   buttons.push([{ text: "🔙 رجوع للأقسام", callback_data: "services" }]);
 
-  await bot.sendMessage(chatId, `📂 *خدمات ${cat?.name || ""}:*`, {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const text = `📂 *خدمات ${cat?.name || ""}:*`;
+  const keyboard = { inline_keyboard: buttons };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showServiceDetail(chatId: number, serviceId: number, telegramId: string) {
+async function showServiceDetail(chatId: number, serviceId: number, telegramId: string, messageId?: number) {
   const svc = await storage.getService(serviceId);
-  if (!svc) return bot.sendMessage(chatId, "❌ الخدمة غير موجودة.");
+  if (!svc) {
+    const errText = "❌ الخدمة غير موجودة.";
+    if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+    return bot.sendMessage(chatId, errText);
+  }
 
   const margin = await getProfitMargin();
   const pricePerK = parseFloat(svc.rate) * (1 + margin / 100);
@@ -136,15 +179,24 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
 
   setState(telegramId, { step: "order_link", serviceId });
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]],
-    },
-  });
+  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]] };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showAccountInfo(chatId: number, telegramId: string) {
+async function showAccountInfo(chatId: number, telegramId: string, messageId?: number) {
   const user = await storage.getUserByTelegramId(telegramId);
   if (!user) return;
 
@@ -157,21 +209,34 @@ async function showAccountInfo(chatId: number, telegramId: string) {
     `🛒 مجموع المصروفات: ${formatNumber(user.totalSpent)} IQD\n` +
     `📦 عدد الطلبات: ${user.totalOrders}`;
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "💸 تحويل أموال", callback_data: "transfer_money" }],
-        [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }],
-      ],
-    },
-  });
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: "💸 تحويل أموال", callback_data: "transfer_money" }],
+      [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }],
+    ],
+  };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showDepositOptions(chatId: number) {
+async function showDepositOptions(chatId: number, messageId?: number) {
   const methods = await storage.getActivePaymentMethods();
   if (methods.length === 0) {
-    return bot.sendMessage(chatId, "❌ لا توجد طرق دفع متاحة حالياً.");
+    const text = "❌ لا توجد طرق دفع متاحة حالياً.";
+    if (messageId) return bot.editMessageText(text, { chat_id: chatId, message_id: messageId });
+    return bot.sendMessage(chatId, text);
   }
 
   const buttons = methods.map((m) => [
@@ -179,13 +244,25 @@ async function showDepositOptions(chatId: number) {
   ]);
   buttons.push([{ text: "🔙 رجوع", callback_data: "main_menu" }]);
 
-  await bot.sendMessage(chatId, "💰 *اختر طريقة الدفع:*", {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const text = "💰 *اختر طريقة الدفع:*";
+  const keyboard = { inline_keyboard: buttons };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showPaymentMethod(chatId: number, methodId: number, telegramId: string) {
+async function showPaymentMethod(chatId: number, methodId: number, telegramId: string, messageId?: number) {
   const method = await storage.getPaymentMethod(methodId);
   if (!method) return;
 
@@ -205,10 +282,21 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
 
   setState(telegramId, { step: "custom_amount", methodId });
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const keyboard = { inline_keyboard: buttons };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
 async function promptScreenshot(chatId: number, telegramId: string, amount: number, methodId: number) {
@@ -221,17 +309,18 @@ async function promptScreenshot(chatId: number, telegramId: string, amount: numb
   );
 }
 
-async function showMyOrders(chatId: number, telegramId: string) {
+async function showMyOrders(chatId: number, telegramId: string, messageId?: number) {
   const user = await storage.getUserByTelegramId(telegramId);
   if (!user) return;
 
   const userOrders = await storage.getOrdersByUser(user.id);
   if (userOrders.length === 0) {
-    return bot.sendMessage(chatId, "📦 لا توجد طلبات حالياً.", {
-      reply_markup: {
-        inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]],
-      },
-    });
+    const text = "📦 لا توجد طلبات حالياً.";
+    const keyboard = { inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]] };
+    if (messageId) {
+      return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, reply_markup: keyboard });
+    }
+    return bot.sendMessage(chatId, text, { reply_markup: keyboard });
   }
 
   const text = "📦 *هذه جميع الطلبات التي قمت بوضعها:*";
@@ -240,15 +329,30 @@ async function showMyOrders(chatId: number, telegramId: string) {
   ]);
   buttons.push([{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]);
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const keyboard = { inline_keyboard: buttons };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showOrderDetail(chatId: number, orderId: number) {
+async function showOrderDetail(chatId: number, orderId: number, messageId?: number) {
   const order = await storage.getOrder(orderId);
-  if (!order) return bot.sendMessage(chatId, "❌ الطلب غير موجود.");
+  if (!order) {
+    const errText = "❌ الطلب غير موجود.";
+    if (messageId) return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+    return bot.sendMessage(chatId, errText);
+  }
 
   const svc = await storage.getService(order.serviceId);
 
@@ -329,17 +433,26 @@ async function showOrderDetail(chatId: number, orderId: number) {
     `${order.providerOrderId ? `🔢 رقم الطلب بالموقع: ${order.providerOrderId}\n` : ""}` +
     `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [[{ text: "🔙 رجوع للطلبات", callback_data: "my_orders" }]],
-    },
-  });
+  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع للطلبات", callback_data: "my_orders" }]] };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
 // ===== ADMIN FUNCTIONS =====
 
-async function showAdminPanel(chatId: number) {
+async function showAdminPanel(chatId: number, messageId?: number) {
   const buttons = [
     [{ text: "📊 الإحصائيات", callback_data: "admin_stats" }],
     [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories" }],
@@ -350,13 +463,25 @@ async function showAdminPanel(chatId: number) {
     [{ text: "💳 طرق الدفع", callback_data: "admin_payments" }],
   ];
 
-  await bot.sendMessage(chatId, "🔐 *لوحة الإدارة*", {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const text = "🔐 *لوحة الإدارة*";
+  const keyboard = { inline_keyboard: buttons };
+
+  if (messageId) {
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
 }
 
-async function showAdminStats(chatId: number) {
+async function showAdminStats(chatId: number, messageId?: number) {
   const userCount = await storage.getUserCount();
   const allStats = await storage.getOrderStats();
   const kd1sStats = await storage.getOrderStatsByProvider("kd1s");
@@ -383,15 +508,15 @@ async function showAdminStats(chatId: number) {
     `المبالغ: ${formatNumber(amazingStats.totalAmount)} IQD\n` +
     `الأرباح: ${formatNumber(amazingStats.totalProfit)} IQD`;
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]],
-    },
-  });
+  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
 }
 
-async function showAdminCategories(chatId: number) {
+async function showAdminCategories(chatId: number, messageId?: number) {
   const cats = await storage.getCategories();
 
   let text = "📂 *إدارة الأقسام*\n\n";
@@ -412,47 +537,51 @@ async function showAdminCategories(chatId: number) {
   ]);
   buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const keyboard = { inline_keyboard: buttons };
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
 }
 
-async function showAdminAddService(chatId: number, telegramId: string) {
+async function showAdminAddService(chatId: number, telegramId: string, messageId?: number) {
   setState(telegramId, { step: "admin_select_provider" });
 
-  await bot.sendMessage(chatId, "🔧 *إضافة خدمة جديدة*\n\nالخدمة من أي موقع؟", {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "kd1s.com", callback_data: "provider_kd1s" },
-          { text: "amazingsmm.com", callback_data: "provider_amazing" },
-        ],
-        [{ text: "🔙 رجوع", callback_data: "admin_panel" }],
+  const addText = "🔧 *إضافة خدمة جديدة*\n\nالخدمة من أي موقع؟";
+  const addKeyboard = {
+    inline_keyboard: [
+      [
+        { text: "kd1s.com", callback_data: "provider_kd1s" },
+        { text: "amazingsmm.com", callback_data: "provider_amazing" },
       ],
-    },
-  });
+      [{ text: "🔙 رجوع", callback_data: "admin_panel" }],
+    ],
+  };
+
+  if (messageId) {
+    await bot.editMessageText(addText, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: addKeyboard });
+  } else {
+    await bot.sendMessage(chatId, addText, { parse_mode: "Markdown", reply_markup: addKeyboard });
+  }
 }
 
-async function showAdminMargin(chatId: number) {
+async function showAdminMargin(chatId: number, messageId?: number) {
   const margin = await getProfitMargin();
 
-  await bot.sendMessage(
-    chatId,
-    `💹 *نسبة الأرباح الحالية: ${margin}%*\n\nأرسل النسبة الجديدة (رقم فقط):`,
-    {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]],
-      },
-    }
-  );
+  const marginText = `💹 *نسبة الأرباح الحالية: ${margin}%*\n\nأرسل النسبة الجديدة (رقم فقط):`;
+  const marginKeyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+
+  if (messageId) {
+    await bot.editMessageText(marginText, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: marginKeyboard });
+  } else {
+    await bot.sendMessage(chatId, marginText, { parse_mode: "Markdown", reply_markup: marginKeyboard });
+  }
 
   setState(chatId.toString(), { step: "admin_set_margin" });
 }
 
-async function showAdminAdmins(chatId: number) {
+async function showAdminAdmins(chatId: number, messageId?: number) {
   const allUsers = await storage.getAllUsers();
   const admins = allUsers.filter((u) => u.isAdmin);
 
@@ -471,10 +600,12 @@ async function showAdminAdmins(chatId: number) {
   ]);
   buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  const keyboard = { inline_keyboard: buttons };
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
 }
 
 async function showEditCategory(chatId: number, slug: string, telegramId: string) {
@@ -586,6 +717,7 @@ export function initBot(): TelegramBot {
   // Callback query handler
   bot.on("callback_query", async (query) => {
     const chatId = query.message!.chat.id;
+    const messageId = query.message!.message_id;
     const telegramId = query.from.id.toString();
     const data = query.data || "";
 
@@ -595,7 +727,7 @@ export function initBot(): TelegramBot {
       // Main menu
       if (data === "main_menu") {
         clearState(telegramId);
-        return sendMainMenu(chatId);
+        return sendMainMenu(chatId, messageId);
       }
 
       if (data === "confirm_order") {
@@ -608,7 +740,9 @@ export function initBot(): TelegramBot {
 
           if (parseFloat(user.balance) < oState.price) {
             clearState(telegramId);
-            return bot.sendMessage(chatId, "❌ رصيدك غير كافٍ. يرجى شحن حسابك أولاً.", {
+            return bot.editMessageText("❌ رصيدك غير كافٍ. يرجى شحن حسابك أولاً.", {
+              chat_id: chatId,
+              message_id: messageId,
               reply_markup: {
                 inline_keyboard: [
                   [{ text: "💰 شحن حسابك", callback_data: "deposit" }],
@@ -621,7 +755,7 @@ export function initBot(): TelegramBot {
           const svc = await storage.getService(oState.serviceId);
           if (!svc) return;
 
-          await bot.sendMessage(chatId, "⏳ جاري معالجة الطلب...");
+          await bot.editMessageText("⏳ جاري معالجة الطلب...", { chat_id: chatId, message_id: messageId });
 
           const result = await smmApi.placeOrder(
             svc.provider as "kd1s" | "amazing",
@@ -709,46 +843,46 @@ export function initBot(): TelegramBot {
 
       if (data === "services") {
         clearState(telegramId);
-        return showServices(chatId);
+        return showServices(chatId, messageId);
       }
 
       if (data === "account_info") {
         clearState(telegramId);
-        return showAccountInfo(chatId, telegramId);
+        return showAccountInfo(chatId, telegramId, messageId);
       }
 
       if (data === "deposit") {
         clearState(telegramId);
-        return showDepositOptions(chatId);
+        return showDepositOptions(chatId, messageId);
       }
 
       if (data === "my_orders") {
         clearState(telegramId);
-        return showMyOrders(chatId, telegramId);
+        return showMyOrders(chatId, telegramId, messageId);
       }
 
       // Category services
       if (data.startsWith("cat_")) {
         const catId = parseInt(data.split("_")[1]);
-        return showCategoryServices(chatId, catId);
+        return showCategoryServices(chatId, catId, messageId);
       }
 
       // Service detail
       if (data.startsWith("svc_")) {
         const svcId = parseInt(data.split("_")[1]);
-        return showServiceDetail(chatId, svcId, telegramId);
+        return showServiceDetail(chatId, svcId, telegramId, messageId);
       }
 
       // Order detail
       if (data.startsWith("order_")) {
         const orderId = parseInt(data.split("_")[1]);
-        return showOrderDetail(chatId, orderId);
+        return showOrderDetail(chatId, orderId, messageId);
       }
 
       // Payment method
       if (data.startsWith("pay_")) {
         const methodId = parseInt(data.split("_")[1]);
-        return showPaymentMethod(chatId, methodId, telegramId);
+        return showPaymentMethod(chatId, methodId, telegramId, messageId);
       }
 
       // Amount selection
@@ -762,7 +896,9 @@ export function initBot(): TelegramBot {
       // Transfer money
       if (data === "transfer_money") {
         setState(telegramId, { step: "transfer_amount" });
-        return bot.sendMessage(chatId, "💸 *تحويل أموال*\n\nأرسل المبلغ المراد تحويله:", {
+        return bot.editMessageText("💸 *تحويل أموال*\n\nأرسل المبلغ المراد تحويله:", {
+          chat_id: chatId,
+          message_id: messageId,
           parse_mode: "Markdown",
         });
       }
@@ -778,7 +914,7 @@ export function initBot(): TelegramBot {
 
         if (parseFloat(sender.balance) < state.amount) {
           clearState(telegramId);
-          return bot.sendMessage(chatId, "❌ رصيدك غير كافٍ.");
+          return bot.editMessageText("❌ رصيدك غير كافٍ.", { chat_id: chatId, message_id: messageId });
         }
 
         await storage.updateUserBalance(sender.id, (-state.amount).toString());
@@ -798,7 +934,7 @@ export function initBot(): TelegramBot {
           description: `تحويل من ${sender.firstName || sender.telegramId}`,
         });
 
-        await bot.sendMessage(chatId, `✅ تم تحويل ${formatNumber(state.amount)} IQD بنجاح!`);
+        await bot.editMessageText(`✅ تم تحويل ${formatNumber(state.amount)} IQD بنجاح!`, { chat_id: chatId, message_id: messageId });
         await bot.sendMessage(
           parseInt(receiver.telegramId),
           `💰 تم استلام ${formatNumber(state.amount)} IQD من ${sender.firstName || sender.telegramId}!`
@@ -810,7 +946,7 @@ export function initBot(): TelegramBot {
 
       if (data === "cancel_transfer") {
         clearState(telegramId);
-        return bot.sendMessage(chatId, "❌ تم إلغاء عملية التحويل.");
+        return bot.editMessageText("❌ تم إلغاء عملية التحويل.", { chat_id: chatId, message_id: messageId });
       }
 
       // ===== ADMIN CALLBACKS =====
@@ -818,32 +954,31 @@ export function initBot(): TelegramBot {
 
       if (data === "admin_panel") {
         clearState(telegramId);
-        return showAdminPanel(chatId);
+        return showAdminPanel(chatId, messageId);
       }
 
-      if (data === "admin_stats") return showAdminStats(chatId);
-      if (data === "admin_categories") return showAdminCategories(chatId);
-      if (data === "admin_add_service") return showAdminAddService(chatId, telegramId);
-      if (data === "admin_margin") return showAdminMargin(chatId);
-      if (data === "admin_admins") return showAdminAdmins(chatId);
+      if (data === "admin_stats") return showAdminStats(chatId, messageId);
+      if (data === "admin_categories") return showAdminCategories(chatId, messageId);
+      if (data === "admin_add_service") return showAdminAddService(chatId, telegramId, messageId);
+      if (data === "admin_margin") return showAdminMargin(chatId, messageId);
+      if (data === "admin_admins") return showAdminAdmins(chatId, messageId);
 
       if (data === "admin_groups") {
-        return bot.sendMessage(
-          chatId,
-          `⚙️ *إعدادات الكروبات*\n\n` +
+        const groupText = `⚙️ *إعدادات الكروبات*\n\n` +
           `كروب الإشعارات: ${notificationGroupId || "غير محدد"}\n` +
           `كروب الإيداعات: ${depositGroupId || "غير محدد"}\n\n` +
           `لتحديد كروب الإشعارات، أضف البوت للكروب ثم أرسل:\n` +
           `/setnotifygroup\n\n` +
           `لتحديد كروب الإيداعات أرسل:\n` +
-          `/setdepositgroup`,
-          {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]],
-            },
-          }
-        );
+          `/setdepositgroup`;
+        return bot.editMessageText(groupText, {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]],
+          },
+        });
       }
 
       if (data === "admin_payments") {
@@ -860,7 +995,9 @@ export function initBot(): TelegramBot {
         ]);
         buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
 
-        return bot.sendMessage(chatId, text, {
+        return bot.editMessageText(text, {
+          chat_id: chatId,
+          message_id: messageId,
           parse_mode: "Markdown",
           reply_markup: { inline_keyboard: buttons },
         });
@@ -872,7 +1009,7 @@ export function initBot(): TelegramBot {
         const cat = await storage.getCategory(catId);
         if (cat) {
           await storage.updateCategory(catId, { isActive: !cat.isActive });
-          await bot.sendMessage(chatId, `✅ تم ${cat.isActive ? "تعطيل" : "تفعيل"} القسم "${cat.name}"`);
+          await bot.editMessageText(`✅ تم ${cat.isActive ? "تعطيل" : "تفعيل"} القسم "${cat.name}"`, { chat_id: chatId, message_id: messageId });
           return showAdminCategories(chatId);
         }
       }
@@ -883,7 +1020,7 @@ export function initBot(): TelegramBot {
         const method = await storage.getPaymentMethod(payId);
         if (method) {
           await storage.updatePaymentMethod(payId, { isActive: !method.isActive });
-          await bot.sendMessage(chatId, `✅ تم ${method.isActive ? "تعطيل" : "تفعيل"} "${method.name}"`);
+          await bot.editMessageText(`✅ تم ${method.isActive ? "تعطيل" : "تفعيل"} "${method.name}"`, { chat_id: chatId, message_id: messageId });
         }
       }
 
@@ -891,7 +1028,7 @@ export function initBot(): TelegramBot {
       if (data === "provider_kd1s" || data === "provider_amazing") {
         const provider = data === "provider_kd1s" ? "kd1s" : "amazing";
         setState(telegramId, { step: "admin_service_id", provider });
-        return bot.sendMessage(chatId, `✅ تم اختيار ${provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n\nأرسل آيدي الخدمة:`);
+        return bot.editMessageText(`✅ تم اختيار ${provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n\nأرسل آيدي الخدمة:`, { chat_id: chatId, message_id: messageId });
       }
 
       // Remove admin
@@ -899,13 +1036,12 @@ export function initBot(): TelegramBot {
         const userId = parseInt(data.split("_")[2]);
         const user = await storage.getUser(userId);
         if (user && user.telegramId !== CREATOR_ID) {
-          await storage.updateUserBalance(user.id, "0"); // just to trigger update
-          // Actually update isAdmin
+          await storage.updateUserBalance(user.id, "0");
           const { db: database } = await import("./db");
           const { users: usersTable } = await import("@shared/schema");
           const { eq } = await import("drizzle-orm");
           await database.update(usersTable).set({ isAdmin: false }).where(eq(usersTable.id, userId));
-          await bot.sendMessage(chatId, `✅ تم إزالة الأدمن ${user.firstName || user.telegramId}`);
+          await bot.editMessageText(`✅ تم إزالة الأدمن ${user.firstName || user.telegramId}`, { chat_id: chatId, message_id: messageId });
           return showAdminAdmins(chatId);
         }
       }
@@ -916,11 +1052,10 @@ export function initBot(): TelegramBot {
         const svc = await storage.getService(svcId);
         if (svc) {
           setState(telegramId, { step: "admin_edit_service", serviceId: svcId });
-          return bot.sendMessage(
-            chatId,
+          return bot.editMessageText(
             `✏️ *تعديل الخدمة: ${svc.name}*\n\n` +
             `أرسل الاسم الجديد أو /skip لتخطي:`,
-            { parse_mode: "Markdown" }
+            { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" }
           );
         }
       }
@@ -950,7 +1085,7 @@ export function initBot(): TelegramBot {
           }
           await bot.editMessageText(
             `✅ *تم تأكيد الإيداع #${depositId}*\nبواسطة: ${query.from.first_name}`,
-            { chat_id: chatId, message_id: query.message!.message_id, parse_mode: "Markdown" }
+            { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" }
           );
         }
       }
@@ -970,7 +1105,7 @@ export function initBot(): TelegramBot {
           }
           await bot.editMessageText(
             `❌ *تم رفض الإيداع #${depositId}*\nبواسطة: ${query.from.first_name}`,
-            { chat_id: chatId, message_id: query.message!.message_id, parse_mode: "Markdown" }
+            { chat_id: chatId, message_id: messageId, parse_mode: "Markdown" }
           );
         }
       }
@@ -1001,14 +1136,15 @@ export function initBot(): TelegramBot {
         });
 
         clearState(telegramId);
-        return bot.sendMessage(
-          chatId,
+        return bot.editMessageText(
           `✅ *تمت إضافة الخدمة بنجاح!*\n\n` +
           `📋 ${serviceInfo.name}\n` +
           `🌐 ${provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n` +
           `🆔 ${serviceInfo.service}\n` +
           `💵 السعر: ${serviceInfo.rate} (+ ${margin}% ربح)`,
           {
+            chat_id: chatId,
+            message_id: messageId,
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
