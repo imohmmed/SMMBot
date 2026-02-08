@@ -11,8 +11,10 @@ process.on("unhandledRejection", (reason) => {
 });
 
 let bot: TelegramBot;
+let botUserId: number | null = null;
 let notificationGroupId: string | null = null;
 let depositGroupId: string | null = null;
+let subscriptionGroupId: string | null = null;
 
 const userStates = new Map<string, any>();
 
@@ -197,15 +199,31 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
     return bot.sendMessage(chatId, errText);
   }
 
-  let text: string;
+  const category = await storage.getCategory(svc.categoryId);
+  const isSubscription = category?.type === "subscriptions";
 
-  if (svc.serviceType === "custom") {
+  let text: string;
+  let keyboard: any;
+
+  if (isSubscription) {
+    const svcPrice = parseFloat(svc.price || "0");
+    text = `🔹 *${svc.name}*\n\n` +
+      `${svc.description ? `📝 ${svc.description}\n\n` : ""}` +
+      `💵 السعر: ${formatNumber(svcPrice)} IQD`;
+    keyboard = {
+      inline_keyboard: [
+        [{ text: "🛒 طلب", callback_data: `order_subscription_${serviceId}` }],
+        [{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }],
+      ],
+    };
+  } else if (svc.serviceType === "custom") {
     const svcPrice = parseFloat(svc.price || "0");
     text = `🔹 *${svc.name}*\n\n` +
       `${svc.description ? `📝 ${svc.description}\n\n` : ""}` +
       `💵 السعر: ${formatNumber(svcPrice)} IQD\n\n` +
       `لتقديم طلب، أرسل الرابط أو المعلومات المطلوبة:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: true });
+    keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]] };
   } else {
     const margin = await getProfitMargin();
     const pricePerK = parseFloat(svc.rate || "0") * (1 + margin / 100);
@@ -217,9 +235,8 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
       `🌐 الموقع: ${svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n\n` +
       `لتقديم طلب، أرسل الرابط المراد:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: false });
+    keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]] };
   }
-
-  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]] };
 
   if (messageId) {
     await bot.editMessageText(text, {
@@ -890,10 +907,17 @@ export function initBot(): TelegramBot {
     console.error("Polling error:", error.message);
   });
 
-  // Load group IDs from settings
+  // Load bot user ID and group IDs from settings
   (async () => {
+    try {
+      const me = await bot.getMe();
+      botUserId = me.id;
+    } catch (e) {
+      console.error("Failed to get bot info:", e);
+    }
     notificationGroupId = (await storage.getSetting("notification_group_id")) || null;
     depositGroupId = (await storage.getSetting("deposit_group_id")) || null;
+    subscriptionGroupId = (await storage.getSetting("subscription_group_id")) || null;
   })();
 
   // /start command
@@ -1059,13 +1083,16 @@ export function initBot(): TelegramBot {
             const providerLabel = svc.serviceType === "custom" ? "خدمة خاصة" : (svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com");
             await bot.sendMessage(
               notificationGroupId,
-              `📦 *طلب جديد #${order.id}*\n\n` +
+              `📦 طلب جديد #${order.id}\n\n` +
+              `👤 الاسم: ${user.firstName || ""} ${user.lastName || ""}\n` +
+              `🆔 الآيدي: ${user.telegramId}\n` +
+              `📱 اليوزر: ${user.username ? "@" + user.username : "غير محدد"}\n` +
               `📋 الخدمة: ${svc.name}\n` +
               `📊 الكمية: ${formatNumber(oState.quantity)}\n` +
+              `🔗 الرابط: ${oState.link}\n` +
               `💵 المبلغ: ${formatNumber(oState.price)} IQD\n` +
               `🌐 النوع: ${providerLabel}`,
               {
-                parse_mode: "Markdown",
                 reply_markup: {
                   inline_keyboard: [
                     [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
@@ -1080,6 +1107,99 @@ export function initBot(): TelegramBot {
           console.error("Order error:", orderError);
           await bot.sendMessage(chatId, "❌ حدث خطأ أثناء معالجة الطلب.");
           clearState(telegramId);
+        }
+        return;
+      }
+
+      // Subscription order - direct order with button click
+      if (data.startsWith("order_subscription_")) {
+        const serviceId = parseInt(data.split("_")[2]);
+        const svc = await storage.getService(serviceId);
+        if (!svc) return;
+
+        const user = await storage.getUserByTelegramId(telegramId);
+        if (!user) return;
+
+        const svcPrice = parseFloat(svc.price || "0");
+
+        if (parseFloat(user.balance) < svcPrice) {
+          return bot.editMessageText("❌ رصيدك غير كافٍ. يرجى شحن حسابك أولاً.", {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "💰 شحن حسابك", callback_data: "deposit" }],
+                [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }],
+              ],
+            },
+          });
+        }
+
+        // Remove buttons immediately to prevent double-click
+        await bot.editMessageText("⏳ جاري معالجة الطلب...", { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
+
+        await storage.updateUserBalance(user.id, (-svcPrice).toString());
+        await storage.updateUserStats(user.id, svcPrice.toString());
+
+        const order = await storage.createOrder({
+          userId: user.id,
+          serviceId: svc.id,
+          providerOrderId: null,
+          provider: "custom",
+          link: "اشتراك",
+          quantity: 1,
+          amount: svcPrice.toString(),
+          cost: "0",
+          profit: svcPrice.toString(),
+          status: "pending",
+        });
+
+        await storage.createTransaction({
+          userId: user.id,
+          type: "order",
+          amount: (-svcPrice).toString(),
+          description: `طلب اشتراك #${order.id} - ${svc.name}`,
+          relatedId: order.id,
+        });
+
+        await storage.incrementServiceStats(svc.id, svcPrice.toString(), svcPrice.toString());
+
+        await bot.sendMessage(
+          chatId,
+          `✅ *تم الطلب بنجاح!*\n\n` +
+          `📦 رقم الطلب: #${order.id}\n` +
+          `📋 الخدمة: ${svc.name}\n` +
+          `💵 المبلغ: ${formatNumber(svcPrice)} IQD\n` +
+          `💰 رصيدك المتبقي: ${formatNumber(parseFloat(user.balance) - svcPrice)} IQD\n\n` +
+          `سيتم تنفيذ طلبك قريباً.`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]],
+            },
+          }
+        );
+
+        // Send to subscription group
+        const targetGroup = subscriptionGroupId || notificationGroupId;
+        if (targetGroup) {
+          await bot.sendMessage(
+            targetGroup,
+            `📦 طلب اشتراك جديد #${order.id}\n\n` +
+            `👤 الاسم: ${user.firstName || ""} ${user.lastName || ""}\n` +
+            `🆔 الآيدي: ${user.telegramId}\n` +
+            `📱 اليوزر: ${user.username ? "@" + user.username : "غير محدد"}\n` +
+            `📋 الخدمة: ${svc.name}\n` +
+            `${svc.description ? `📝 الوصف: ${svc.description}\n` : ""}` +
+            `💵 المبلغ: ${formatNumber(svcPrice)} IQD`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
+                ],
+              },
+            }
+          );
         }
         return;
       }
@@ -1285,11 +1405,14 @@ export function initBot(): TelegramBot {
       if (data === "admin_groups") {
         const groupText = `⚙️ *إعدادات الكروبات*\n\n` +
           `كروب الإشعارات: ${notificationGroupId || "غير محدد"}\n` +
-          `كروب الإيداعات: ${depositGroupId || "غير محدد"}\n\n` +
+          `كروب الإيداعات: ${depositGroupId || "غير محدد"}\n` +
+          `كروب الاشتراكات: ${subscriptionGroupId || "غير محدد"}\n\n` +
           `لتحديد كروب الإشعارات، أضف البوت للكروب ثم أرسل:\n` +
           `/setnotifygroup\n\n` +
           `لتحديد كروب الإيداعات أرسل:\n` +
-          `/setdepositgroup`;
+          `/setdepositgroup\n\n` +
+          `لتحديد كروب الاشتراكات أرسل:\n` +
+          `/setsubscriptiongroup`;
         return bot.editMessageText(groupText, {
           chat_id: chatId,
           message_id: messageId,
@@ -2068,6 +2191,85 @@ export function initBot(): TelegramBot {
     depositGroupId = msg.chat.id.toString();
     await storage.setSetting("deposit_group_id", depositGroupId);
     await bot.sendMessage(msg.chat.id, "✅ تم تحديد هذا الكروب لطلبات الإيداع.");
+  });
+
+  // Set subscription group
+  bot.onText(/\/setsubscriptiongroup/, async (msg) => {
+    const telegramId = msg.from!.id.toString();
+    if (!(await isAdmin(telegramId))) return;
+
+    if (msg.chat.type === "private") {
+      return bot.sendMessage(msg.chat.id, "❌ يجب إرسال هذا الأمر في الكروب.");
+    }
+
+    subscriptionGroupId = msg.chat.id.toString();
+    await storage.setSetting("subscription_group_id", subscriptionGroupId);
+    await bot.sendMessage(msg.chat.id, "✅ تم تحديد هذا الكروب لطلبات الاشتراكات.");
+  });
+
+  // Reply forwarding: when admin replies to a bot message in any group, forward the reply to the original user
+  bot.on("message", async (msg) => {
+    try {
+      if (msg.chat.type === "private") return;
+      if (!msg.reply_to_message) return;
+      if (!msg.from) return;
+
+      const senderTelegramId = msg.from.id.toString();
+      if (!(await isAdmin(senderTelegramId))) return;
+
+      const repliedMsg = msg.reply_to_message;
+      if (repliedMsg.from?.id !== botUserId) return;
+
+      const groupId = msg.chat.id.toString();
+      const isAdminGroup = groupId === notificationGroupId || groupId === depositGroupId || groupId === subscriptionGroupId;
+      if (!isAdminGroup) return;
+
+      let targetTelegramId: string | null = null;
+
+      const msgText = repliedMsg.text || repliedMsg.caption || "";
+      const idMatch = msgText.match(/الآيدي:\s*(\d+)/);
+      if (idMatch) {
+        targetTelegramId = idMatch[1];
+      }
+
+      if (!targetTelegramId && repliedMsg.reply_markup?.inline_keyboard) {
+        for (const row of repliedMsg.reply_markup.inline_keyboard) {
+          for (const btn of row) {
+            const urlMatch = btn.url?.match(/tg:\/\/user\?id=(\d+)/);
+            if (urlMatch) {
+              targetTelegramId = urlMatch[1];
+              break;
+            }
+          }
+          if (targetTelegramId) break;
+        }
+      }
+
+      if (!targetTelegramId) return;
+
+      if (msg.text) {
+        await bot.sendMessage(parseInt(targetTelegramId), msg.text);
+      } else if (msg.photo) {
+        const photo = msg.photo[msg.photo.length - 1];
+        await bot.sendPhoto(parseInt(targetTelegramId), photo.file_id, {
+          caption: msg.caption || undefined,
+        });
+      } else if (msg.document) {
+        await bot.sendDocument(parseInt(targetTelegramId), msg.document.file_id, {
+          caption: msg.caption || undefined,
+        });
+      } else if (msg.video) {
+        await bot.sendVideo(parseInt(targetTelegramId), msg.video.file_id, {
+          caption: msg.caption || undefined,
+        });
+      } else if (msg.voice) {
+        await bot.sendVoice(parseInt(targetTelegramId), msg.voice.file_id);
+      } else if (msg.sticker) {
+        await bot.sendSticker(parseInt(targetTelegramId), msg.sticker.file_id);
+      }
+    } catch (error) {
+      console.error("Reply forwarding error:", error);
+    }
   });
 
   return bot;

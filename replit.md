@@ -35,6 +35,17 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - `/editinsta`, `/edityoutube`, `/editfacebook`, `/edittiktok`, `/edittwitter`, `/edittelegram` - Edit category services (admin only)
 - `/setnotifygroup` - Set order notification group (in group, admin only)
 - `/setdepositgroup` - Set deposit approval group (in group, admin only)
+- `/setsubscriptiongroup` - Set subscription orders group (in group, admin only)
+
+## Order Flow
+- **SMM/Custom services**: User sends link → confirms → balance deducted → notification to orders group
+- **Subscriptions**: User sees service details with "طلب" button → clicks to order → balance deducted → notification to subscriptions group
+- Three groups: orders (notificationGroupId), deposits (depositGroupId), subscriptions (subscriptionGroupId)
+
+## Reply Forwarding
+- When admin replies to any bot message in any of the 3 groups, the reply is forwarded to the original user
+- Works with text, photos, documents, videos, voice, stickers
+- Extracts user ID from the "الآيدي" field in the message or from the user button URL
 
 ## Broadcast System
 - Available from both bot admin panel and web dashboard
