@@ -9,9 +9,11 @@ interface Service {
   categoryId: number;
   name: string;
   description: string | null;
-  provider: string;
-  providerServiceId: number;
-  rate: string;
+  serviceType: string;
+  provider: string | null;
+  providerServiceId: number | null;
+  price: string | null;
+  rate: string | null;
   minQuantity: number;
   maxQuantity: number;
   isActive: boolean;
@@ -24,6 +26,7 @@ interface Category {
   id: number;
   name: string;
   slug: string;
+  type: string;
   isActive: boolean;
 }
 
@@ -79,8 +82,11 @@ export default function ServicesPage() {
 
         return (
           <div key={cat.id} className="space-y-3">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2 flex-wrap">
               {cat.name}
+              <Badge variant="secondary" className="text-xs">
+                {cat.type === "subscriptions" ? "اشتراكات" : "سوشل ميديا"}
+              </Badge>
               <Badge variant={cat.isActive ? "default" : "destructive"} className="text-xs">
                 {cat.isActive ? "مفعل" : "معطل"}
               </Badge>
@@ -93,10 +99,14 @@ export default function ServicesPage() {
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <h3 className="font-semibold text-sm">{svc.name}</h3>
                       <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="text-xs">
-                          <Globe className="w-3 h-3 ml-1" />
-                          {svc.provider === "kd1s" ? "kd1s" : "amazing"}
-                        </Badge>
+                        {svc.serviceType === "custom" ? (
+                          <Badge variant="outline" className="text-xs">خدمة خاصة</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            <Globe className="w-3 h-3 ml-1" />
+                            {svc.provider === "kd1s" ? "kd1s" : "amazing"}
+                          </Badge>
+                        )}
                         {!svc.isActive && <Badge variant="destructive" className="text-xs">معطل</Badge>}
                       </div>
                     </div>
@@ -104,18 +114,27 @@ export default function ServicesPage() {
                       <p className="text-xs text-muted-foreground">{svc.description}</p>
                     )}
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-muted-foreground">آيدي الخدمة: </span>
-                        <span className="font-mono">{svc.providerServiceId}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">السعر/1000: </span>
-                        <span>{svc.rate}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">الحدود: </span>
-                        <span>{svc.minQuantity} - {formatNumber(svc.maxQuantity)}</span>
-                      </div>
+                      {svc.serviceType === "custom" ? (
+                        <div>
+                          <span className="text-muted-foreground">السعر: </span>
+                          <span>{formatNumber(svc.price || 0)} IQD</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <span className="text-muted-foreground">آيدي الخدمة: </span>
+                            <span className="font-mono">{svc.providerServiceId}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">السعر/1000: </span>
+                            <span>{svc.rate}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">الحدود: </span>
+                            <span>{svc.minQuantity} - {formatNumber(svc.maxQuantity)}</span>
+                          </div>
+                        </>
+                      )}
                       <div>
                         <span className="text-muted-foreground">الطلبات: </span>
                         <span>{svc.totalOrders}</span>

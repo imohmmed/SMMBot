@@ -22,6 +22,7 @@ export const categories = pgTable("categories", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   emoji: text("emoji"),
+  type: text("type").notNull().default("smm"),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
 });
@@ -31,10 +32,12 @@ export const services = pgTable("services", {
   categoryId: integer("category_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
-  provider: text("provider").notNull(), // 'kd1s' or 'amazing'
-  providerServiceId: integer("provider_service_id").notNull(),
-  rate: numeric("rate", { precision: 12, scale: 4 }).notNull(), // original rate from provider
-  minQuantity: integer("min_quantity").notNull().default(10),
+  serviceType: text("service_type").notNull().default("provider"),
+  provider: text("provider"),
+  providerServiceId: integer("provider_service_id"),
+  price: numeric("price", { precision: 12, scale: 2 }),
+  rate: numeric("rate", { precision: 12, scale: 4 }),
+  minQuantity: integer("min_quantity").notNull().default(1),
   maxQuantity: integer("max_quantity").notNull().default(10000),
   isActive: boolean("is_active").notNull().default(true),
   totalOrders: integer("total_orders").notNull().default(0),

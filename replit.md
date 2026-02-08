@@ -9,6 +9,13 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - **Bot**: node-telegram-bot-api with polling mode
 - **APIs**: SMM Panel API v2 integration with kd1s.com and amazingsmm.com
 
+## Service Types
+- **SMM Services (سوشل ميديا)**: Provider-based services from kd1s.com/amazingsmm.com + custom support services added manually by admin
+- **Subscriptions (اشتراكات)**: Manual subscription services (Netflix, Shahid, etc.) added by admin with fixed pricing
+- Categories have a `type` field: "smm" or "subscriptions"
+- Services have a `serviceType` field: "provider" (from API) or "custom" (manual, fixed price)
+- Custom services have a `price` field instead of `rate` and don't call external APIs when ordered
+
 ## Key Files
 - `server/bot.ts` - Main Telegram bot logic (commands, callbacks, message handlers)
 - `server/smm-api.ts` - SMM API client for kd1s.com and amazingsmm.com
@@ -36,4 +43,4 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - `ADMIN_USERNAME` - Admin username for user contact
 
 ## Database Tables
-users, categories, services, orders, deposits, transactions, settings, payment_methods
+users, categories (with type: smm/subscriptions), services (with serviceType: provider/custom, price for custom), orders, deposits, transactions, settings, payment_methods
