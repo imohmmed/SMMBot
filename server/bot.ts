@@ -1,7 +1,14 @@
 import TelegramBot from "node-telegram-bot-api";
 import { storage } from "./storage";
 import * as smmApi from "./smm-api";
-import type { User, Service, Category } from "@shared/schema";
+import type { User, Service, Category, Order } from "@shared/schema";
+
+function getOrderDisplayId(order: Order): string {
+  if (order.provider === "custom") {
+    return `${order.sequentialId || order.id}`;
+  }
+  return order.providerOrderId || `${order.id}`;
+}
 
 const CREATOR_ID = process.env.CREATOR_TELEGRAM_ID || "1384026800";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "@mohmmed";
@@ -382,7 +389,7 @@ async function showMyOrders(chatId: number, telegramId: string, messageId?: numb
 
   const text = "📦 *هذه جميع الطلبات التي قمت بوضعها:*";
   const buttons = userOrders.slice(0, 20).map((o) => [
-    { text: `طلب #${o.id} - ${o.status}`, callback_data: `order_${o.id}` },
+    { text: `طلب #${getOrderDisplayId(o)} - ${o.status}`, callback_data: `order_${o.id}` },
   ]);
   buttons.push([{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]);
 
@@ -425,6 +432,7 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
         if (providerStatus.toLowerCase() === "canceled" || providerStatus.toLowerCase() === "cancelled" || providerStatus.toLowerCase() === "refunded") {
           if (order.status !== "cancelled" && order.status !== "refunded") {
             await storage.updateOrderStatus(order.id, "cancelled");
+            const refundDisplayId = getOrderDisplayId(order);
             const user = await storage.getUser(order.userId);
             if (user) {
               await storage.updateUserBalance(user.id, order.amount);
@@ -432,20 +440,20 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
                 userId: user.id,
                 type: "refund",
                 amount: order.amount,
-                description: `استرجاع طلب #${order.id}`,
+                description: `استرجاع طلب #${refundDisplayId}`,
                 relatedId: order.id,
               });
 
               await bot.sendMessage(
                 parseInt(user.telegramId),
-                `🔄 *تم إلغاء الطلب #${order.id}*\n\nتم إرجاع المبلغ ${formatNumber(order.amount)} IQD إلى رصيدك.`,
+                `🔄 *تم إلغاء الطلب #${refundDisplayId}*\n\nتم إرجاع المبلغ ${formatNumber(order.amount)} IQD إلى رصيدك.`,
                 { parse_mode: "Markdown" }
               );
 
               if (notificationGroupId) {
                 await bot.sendMessage(
                   notificationGroupId,
-                  `🔄 *تم إلغاء الطلب #${order.id}*\nالمستخدم: ${user.firstName || ""} (${user.telegramId})\nالمبلغ المسترجع: ${formatNumber(order.amount)} IQD`,
+                  `🔄 *تم إلغاء الطلب #${refundDisplayId}*\nالمستخدم: ${user.firstName || ""} (${user.telegramId})\nالمبلغ المسترجع: ${formatNumber(order.amount)} IQD`,
                   { parse_mode: "Markdown" }
                 );
               }
@@ -480,14 +488,15 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
     "Refunded": "💰 مسترجع",
   };
 
-  const text = `📦 *تفاصيل الطلب #${order.id}*\n\n` +
+  const displayId = getOrderDisplayId(order);
+  const providerLine = order.provider === "custom" ? "🛠 خدمة خاصة" : `🌐 الموقع: ${order.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}`;
+  const text = `📦 *تفاصيل الطلب #${displayId}*\n\n` +
     `📋 الخدمة: ${svc?.name || "غير معروف"}\n` +
-    `🔗 الرابط: ${order.link}\n` +
+    `${order.link !== "اشتراك" ? `🔗 الرابط: ${order.link}\n` : ""}` +
     `📊 الكمية: ${formatNumber(order.quantity)}\n` +
     `💵 المبلغ: ${formatNumber(order.amount)} IQD\n` +
-    `🌐 الموقع: ${order.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n` +
+    `${providerLine}\n` +
     `📌 الحالة: ${statusMap[providerStatus] || providerStatus}\n` +
-    `${order.providerOrderId ? `🔢 رقم الطلب بالموقع: ${order.providerOrderId}\n` : ""}` +
     `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
 
   const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع للطلبات", callback_data: "my_orders" }]] };
@@ -684,6 +693,7 @@ async function showAdminAddService(chatId: number, telegramId: string, messageId
         { text: "amazingsmm.com", callback_data: "provider_amazing" },
       ],
       [{ text: "🛠 خدمة خاصة (يدوية)", callback_data: "provider_custom" }],
+      [{ text: "📺 اضافة اشتراك", callback_data: "provider_subscription" }],
       [{ text: "🔙 رجوع", callback_data: "admin_panel" }],
     ],
   };
@@ -1053,11 +1063,13 @@ export function initBot(): TelegramBot {
             status: orderStatus,
           });
 
+          const displayId = getOrderDisplayId(order);
+
           await storage.createTransaction({
             userId: user.id,
             type: "order",
             amount: (-oState.price).toString(),
-            description: `طلب #${order.id} - ${svc.name}`,
+            description: `طلب #${displayId} - ${svc.name}`,
             relatedId: order.id,
           });
 
@@ -1066,7 +1078,7 @@ export function initBot(): TelegramBot {
           await bot.sendMessage(
             chatId,
             `✅ *تم الطلب بنجاح!*\n\n` +
-            `📦 رقم الطلب: #${order.id}\n` +
+            `📦 رقم الطلب: #${displayId}\n` +
             `📋 الخدمة: ${svc.name}\n` +
             `📊 الكمية: ${formatNumber(oState.quantity)}\n` +
             `💵 المبلغ: ${formatNumber(oState.price)} IQD\n` +
@@ -1083,7 +1095,7 @@ export function initBot(): TelegramBot {
             const providerLabel = svc.serviceType === "custom" ? "خدمة خاصة" : (svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com");
             await bot.sendMessage(
               notificationGroupId,
-              `📦 طلب جديد #${order.id}\n\n` +
+              `📦 طلب جديد #${displayId}\n\n` +
               `👤 الاسم: ${user.firstName || ""} ${user.lastName || ""}\n` +
               `🆔 الآيدي: ${user.telegramId}\n` +
               `📱 اليوزر: ${user.username ? "@" + user.username : "غير محدد"}\n` +
@@ -1154,11 +1166,13 @@ export function initBot(): TelegramBot {
           status: "pending",
         });
 
+        const displayId = getOrderDisplayId(order);
+
         await storage.createTransaction({
           userId: user.id,
           type: "order",
           amount: (-svcPrice).toString(),
-          description: `طلب اشتراك #${order.id} - ${svc.name}`,
+          description: `طلب اشتراك #${displayId} - ${svc.name}`,
           relatedId: order.id,
         });
 
@@ -1167,7 +1181,7 @@ export function initBot(): TelegramBot {
         await bot.sendMessage(
           chatId,
           `✅ *تم الطلب بنجاح!*\n\n` +
-          `📦 رقم الطلب: #${order.id}\n` +
+          `📦 رقم الطلب: #${displayId}\n` +
           `📋 الخدمة: ${svc.name}\n` +
           `💵 المبلغ: ${formatNumber(svcPrice)} IQD\n` +
           `💰 رصيدك المتبقي: ${formatNumber(parseFloat(user.balance) - svcPrice)} IQD\n\n` +
@@ -1185,7 +1199,7 @@ export function initBot(): TelegramBot {
         if (targetGroup) {
           await bot.sendMessage(
             targetGroup,
-            `📦 طلب اشتراك جديد #${order.id}\n\n` +
+            `📦 طلب اشتراك جديد #${displayId}\n\n` +
             `👤 الاسم: ${user.firstName || ""} ${user.lastName || ""}\n` +
             `🆔 الآيدي: ${user.telegramId}\n` +
             `📱 اليوزر: ${user.username ? "@" + user.username : "غير محدد"}\n` +
@@ -1481,11 +1495,12 @@ export function initBot(): TelegramBot {
         return bot.editMessageText(`✅ تم اختيار ${provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n\nأرسل آيدي الخدمة:`, { chat_id: chatId, message_id: messageId });
       }
 
-      // Custom service flow
+      // Custom service flow (SMM only)
       if (data === "provider_custom") {
         const cats = await storage.getCategories();
-        const buttons = cats.map(c => [
-          { text: `${c.type === "smm" ? "📱" : "📺"} ${c.name}`, callback_data: `custom_cat_${c.id}` },
+        const smmCats = cats.filter(c => c.type === "smm");
+        const buttons = smmCats.map(c => [
+          { text: `📱 ${c.name}`, callback_data: `custom_cat_${c.id}` },
         ]);
         buttons.push([{ text: "🔙 رجوع", callback_data: "admin_add_service" }]);
         return bot.editMessageText("🛠 *إضافة خدمة خاصة*\n\nاختر القسم:", {
@@ -1494,6 +1509,36 @@ export function initBot(): TelegramBot {
           parse_mode: "Markdown",
           reply_markup: { inline_keyboard: buttons },
         });
+      }
+
+      // Subscription service flow
+      if (data === "provider_subscription") {
+        const cats = await storage.getCategories();
+        const subCats = cats.filter(c => c.type === "subscriptions");
+        if (subCats.length === 0) {
+          return bot.editMessageText("❌ لا توجد أقسام اشتراكات. أضف قسم اشتراكات أولاً من إدارة الأقسام.", {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_add_service" }]] },
+          });
+        }
+        const buttons = subCats.map(c => [
+          { text: `📺 ${c.name}`, callback_data: `sub_cat_${c.id}` },
+        ]);
+        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_add_service" }]);
+        return bot.editMessageText("📺 *إضافة اشتراك*\n\nاختر القسم:", {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: { inline_keyboard: buttons },
+        });
+      }
+
+      // Subscription category selected - ask for service name
+      if (data.startsWith("sub_cat_")) {
+        const catId = parseInt(data.split("_")[2]);
+        setState(telegramId, { step: "sub_service_name", categoryId: catId });
+        return bot.editMessageText("📝 أرسل اسم الاشتراك:", { chat_id: chatId, message_id: messageId });
       }
 
       if (data.startsWith("custom_cat_")) {
@@ -1928,6 +1973,51 @@ export function initBot(): TelegramBot {
 
         clearState(telegramId);
         return bot.sendMessage(chatId, `✅ تم إضافة الخدمة "${state.serviceName}" بسعر ${formatNumber(price)} IQD`, {
+          reply_markup: {
+            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
+          },
+        });
+      }
+
+      // Subscription service flow - name
+      if (state.step === "sub_service_name" && msg.text) {
+        setState(telegramId, { ...state, step: "sub_service_desc", serviceName: msg.text.trim() });
+        return bot.sendMessage(chatId, "📝 أرسل وصف الاشتراك (أو /skip لتخطي):");
+      }
+
+      // Subscription service flow - description
+      if (state.step === "sub_service_desc" && msg.text) {
+        const desc = msg.text === "/skip" ? null : msg.text.trim();
+        setState(telegramId, { ...state, step: "sub_service_price", serviceDescription: desc });
+        return bot.sendMessage(chatId, "💵 أرسل سعر الاشتراك (بالدينار العراقي):");
+      }
+
+      // Subscription service flow - price
+      if (state.step === "sub_service_price" && msg.text) {
+        const price = parseFloat(msg.text.replace(/,/g, ""));
+        if (isNaN(price) || price <= 0) {
+          return bot.sendMessage(chatId, "❌ أرسل سعر صحيح.");
+        }
+
+        await storage.createService({
+          categoryId: state.categoryId,
+          name: state.serviceName,
+          description: state.serviceDescription || null,
+          serviceType: "custom",
+          provider: null,
+          providerServiceId: null,
+          price: price.toString(),
+          rate: null,
+          minQuantity: 1,
+          maxQuantity: 1,
+          isActive: true,
+          totalOrders: 0,
+          totalRevenue: "0",
+          totalProfit: "0",
+        });
+
+        clearState(telegramId);
+        return bot.sendMessage(chatId, `✅ تم إضافة الاشتراك "${state.serviceName}" بسعر ${formatNumber(price)} IQD`, {
           reply_markup: {
             inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
           },

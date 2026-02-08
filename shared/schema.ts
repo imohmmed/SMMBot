@@ -47,6 +47,7 @@ export const services = pgTable("services", {
 
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
+  sequentialId: integer("sequential_id"),
   userId: integer("user_id").notNull(),
   serviceId: integer("service_id").notNull(),
   providerOrderId: varchar("provider_order_id", { length: 50 }),
@@ -54,9 +55,9 @@ export const orders = pgTable("orders", {
   link: text("link").notNull(),
   quantity: integer("quantity").notNull(),
   amount: numeric("amount", { precision: 12, scale: 4 }).notNull(),
-  cost: numeric("cost", { precision: 12, scale: 4 }).notNull(), // what we paid provider
+  cost: numeric("cost", { precision: 12, scale: 4 }).notNull(),
   profit: numeric("profit", { precision: 12, scale: 4 }).notNull().default("0"),
-  status: text("status").notNull().default("pending"), // pending, processing, in_progress, completed, partial, cancelled, refunded
+  status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

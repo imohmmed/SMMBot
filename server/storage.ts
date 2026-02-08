@@ -214,6 +214,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrder(order: InsertOrder): Promise<Order> {
+    if (order.provider === "custom") {
+      const [maxSeqResult] = await db.select({
+        maxId: sql<number>`COALESCE(MAX(${orders.sequentialId}), 0)`
+      }).from(orders);
+      const nextSeqId = (maxSeqResult?.maxId || 0) + 1;
+      const [created] = await db.insert(orders).values({ ...order, sequentialId: nextSeqId }).returning();
+      return created;
+    }
     const [created] = await db.insert(orders).values(order).returning();
     return created;
   }

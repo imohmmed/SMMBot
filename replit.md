@@ -42,6 +42,18 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - **Subscriptions**: User sees service details with "طلب" button → clicks to order → balance deducted → notification to subscriptions group
 - Three groups: orders (notificationGroupId), deposits (depositGroupId), subscriptions (subscriptionGroupId)
 
+## Order ID System
+- **Custom/Subscription orders**: Sequential IDs (1, 2, 3...) stored in `sequentialId` column, displayed to users
+- **API orders (kd1s/amazing)**: Display the provider's `providerOrderId` from the external API
+- Helper function `getOrderDisplayId(order)` handles this logic throughout the bot
+- Internal `order.id` (serial primary key) is always used for database references/relatedId
+
+## Admin Add Service
+- Three options: kd1s.com, amazingsmm.com, خدمة خاصة (يدوية), اضافة اشتراك
+- "خدمة خاصة" shows only SMM categories for adding custom support services
+- "اضافة اشتراك" shows only subscription categories for adding subscription services
+- Both flows: select category → enter name → enter description (or /skip) → enter price
+
 ## Reply Forwarding
 - When admin replies to any bot message in any of the 3 groups, the reply is forwarded to the original user
 - Works with text, photos, documents, videos, voice, stickers
