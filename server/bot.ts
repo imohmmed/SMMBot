@@ -525,14 +525,12 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
 async function showAdminPanel(chatId: number, messageId?: number) {
   const buttons = [
     [{ text: "📊 الإحصائيات", callback_data: "admin_stats" }],
-    [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories" }],
-    [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service" }],
-    [{ text: "✏️ تعديل خدمة", callback_data: "admin_edit_services" }, { text: "🗑 حذف خدمة", callback_data: "admin_delete_services" }],
-    [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin" }],
-    [{ text: "👑 الأدمنية", callback_data: "admin_admins" }],
     [{ text: "📢 الإذاعة", callback_data: "admin_broadcast" }],
+    [{ text: "👑 الأدمنية", callback_data: "admin_admins" }],
+    [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories" }],
+    [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service" }, { text: "✏️ تعديل", callback_data: "admin_edit_services" }, { text: "🗑 حذف", callback_data: "admin_delete_services" }],
+    [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin" }, { text: "💳 طرق الدفع", callback_data: "admin_payments" }],
     [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups" }],
-    [{ text: "💳 طرق الدفع", callback_data: "admin_payments" }],
   ];
 
   const text = "🔐 *لوحة الإدارة*";
