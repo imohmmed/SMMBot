@@ -137,24 +137,48 @@ export async function registerRoutes(
         ? { reply_markup: { inline_keyboard: [[{ text: buttonText, url: buttonUrl }]] } }
         : {};
 
-      for (const user of users) {
-        try {
-          if (imageUrl) {
-            await bot.sendPhoto(user.telegramId, imageUrl, {
-              caption: message || "",
-              parse_mode: "Markdown",
-              ...inlineKeyboard,
-            });
-          } else {
-            await bot.sendMessage(user.telegramId, message, {
-              parse_mode: "Markdown",
-              ...inlineKeyboard,
-            });
+      const BATCH_SIZE = 25;
+
+      for (let i = 0; i < users.length; i++) {
+        const user = users[i];
+        let success = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            if (imageUrl) {
+              await bot.sendPhoto(user.telegramId, imageUrl, {
+                caption: message || "",
+                ...inlineKeyboard,
+              });
+            } else {
+              await bot.sendMessage(user.telegramId, message, {
+                ...inlineKeyboard,
+              });
+            }
+            success = true;
+            break;
+          } catch (e: any) {
+            const errMsg = e?.response?.body?.description || e?.message || "";
+            if (errMsg.includes("Too Many Requests") || errMsg.includes("429")) {
+              const retryAfter = e?.response?.body?.parameters?.retry_after || 5;
+              await new Promise(r => setTimeout(r, retryAfter * 1000));
+              continue;
+            }
+            if (errMsg.includes("bot was blocked") || errMsg.includes("user is deactivated") ||
+                errMsg.includes("chat not found") || errMsg.includes("PEER_ID_INVALID")) {
+              break;
+            }
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+              continue;
+            }
           }
-          sent++;
-          await new Promise(r => setTimeout(r, 50));
-        } catch (e) {
-          failed++;
+        }
+        if (success) sent++; else failed++;
+
+        if ((i + 1) % BATCH_SIZE === 0) {
+          await new Promise(r => setTimeout(r, 1000));
+        } else {
+          await new Promise(r => setTimeout(r, 35));
         }
       }
 

@@ -6,6 +6,10 @@ import type { User, Service, Category } from "@shared/schema";
 const CREATOR_ID = process.env.CREATOR_TELEGRAM_ID || "1384026800";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "@mohmmed";
 
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason instanceof Error ? reason.message : reason);
+});
+
 let bot: TelegramBot;
 let notificationGroupId: string | null = null;
 let depositGroupId: string | null = null;
@@ -496,6 +500,7 @@ async function showAdminPanel(chatId: number, messageId?: number) {
     [{ text: "✏️ تعديل خدمة", callback_data: "admin_edit_services" }],
     [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin" }],
     [{ text: "👑 الأدمنية", callback_data: "admin_admins" }],
+    [{ text: "📢 الإذاعة", callback_data: "admin_broadcast" }],
     [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups" }],
     [{ text: "💳 طرق الدفع", callback_data: "admin_payments" }],
   ];
@@ -758,6 +763,115 @@ async function showEditCategory(chatId: number, slug: string, telegramId: string
   });
 }
 
+async function sendToUser(
+  userId: string,
+  broadcastData: { text?: string; imageUrl?: string; buttonText?: string; buttonUrl?: string },
+  inlineKeyboard: any,
+  retries = 3
+): Promise<boolean> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      if (broadcastData.imageUrl) {
+        await bot.sendPhoto(userId, broadcastData.imageUrl, {
+          caption: broadcastData.text || "",
+          ...inlineKeyboard,
+        });
+      } else if (broadcastData.text) {
+        await bot.sendMessage(userId, broadcastData.text, {
+          ...inlineKeyboard,
+        });
+      }
+      return true;
+    } catch (e: any) {
+      const errMsg = e?.response?.body?.description || e?.message || "";
+      if (errMsg.includes("Too Many Requests") || errMsg.includes("429")) {
+        const retryAfter = e?.response?.body?.parameters?.retry_after || 5;
+        await new Promise(r => setTimeout(r, retryAfter * 1000));
+        continue;
+      }
+      if (errMsg.includes("bot was blocked") || errMsg.includes("user is deactivated") ||
+          errMsg.includes("chat not found") || errMsg.includes("PEER_ID_INVALID")) {
+        return false;
+      }
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      return false;
+    }
+  }
+  return false;
+}
+
+async function sendBroadcast(
+  chatId: number,
+  telegramId: string,
+  broadcastData: { text?: string; imageUrl?: string; buttonText?: string; buttonUrl?: string }
+) {
+  const users = await storage.getAllUsers();
+  const totalUsers = users.length;
+
+  const statusMsg = await bot.sendMessage(chatId,
+    `📢 *جاري الإرسال...*\n\n` +
+    `👥 إجمالي المستخدمين: ${totalUsers}\n` +
+    `✅ تم الإرسال: 0\n` +
+    `❌ فشل: 0`,
+    { parse_mode: "Markdown" }
+  );
+
+  const inlineKeyboard = broadcastData.buttonText && broadcastData.buttonUrl
+    ? { reply_markup: { inline_keyboard: [[{ text: broadcastData.buttonText, url: broadcastData.buttonUrl }]] } }
+    : {};
+
+  let sent = 0;
+  let failed = 0;
+  const BATCH_SIZE = 25;
+  const DELAY_BETWEEN_MESSAGES = 35;
+  const DELAY_BETWEEN_BATCHES = 1000;
+
+  for (let i = 0; i < users.length; i++) {
+    const success = await sendToUser(users[i].telegramId, broadcastData, inlineKeyboard);
+    if (success) {
+      sent++;
+    } else {
+      failed++;
+    }
+
+    if ((i + 1) % BATCH_SIZE === 0) {
+      await new Promise(r => setTimeout(r, DELAY_BETWEEN_BATCHES));
+      try {
+        await bot.editMessageText(
+          `📢 *جاري الإرسال...*\n\n` +
+          `👥 إجمالي المستخدمين: ${totalUsers}\n` +
+          `✅ تم الإرسال: ${sent}\n` +
+          `❌ فشل: ${failed}\n` +
+          `📊 التقدم: ${i + 1}/${totalUsers}`,
+          { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: "Markdown" }
+        );
+      } catch {}
+    } else {
+      await new Promise(r => setTimeout(r, DELAY_BETWEEN_MESSAGES));
+    }
+  }
+
+  try {
+    await bot.editMessageText(
+      `📢 *تم الانتهاء من الإذاعة!*\n\n` +
+      `👥 إجمالي المستخدمين: ${totalUsers}\n` +
+      `✅ تم الإرسال: ${sent}\n` +
+      `❌ فشل: ${failed}`,
+      {
+        chat_id: chatId,
+        message_id: statusMsg.message_id,
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]] },
+      }
+    );
+  } catch {}
+
+  clearState(telegramId);
+}
+
 export function getBot(): TelegramBot {
   return bot;
 }
@@ -771,6 +885,10 @@ export function initBot(): TelegramBot {
 
   bot = new TelegramBot(token, { polling: true });
   console.log("Telegram bot started with polling...");
+
+  bot.on("polling_error", (error) => {
+    console.error("Polling error:", error.message);
+  });
 
   // Load group IDs from settings
   (async () => {
@@ -837,7 +955,7 @@ export function initBot(): TelegramBot {
     const telegramId = query.from.id.toString();
     const data = query.data || "";
 
-    await bot.answerCallbackQuery(query.id);
+    try { await bot.answerCallbackQuery(query.id); } catch {}
 
     try {
       // Main menu
@@ -1099,6 +1217,71 @@ export function initBot(): TelegramBot {
       if (data === "admin_margin") return showAdminMargin(chatId, messageId);
       if (data === "admin_admins") return showAdminAdmins(chatId, messageId);
 
+      if (data === "admin_broadcast") {
+        const userCount = await storage.getUserCount();
+        const text = `📢 *الإذاعة*\n\n` +
+          `👥 عدد المستخدمين: ${userCount}\n\n` +
+          `اختر نوع الإذاعة:`;
+        return bot.editMessageText(text, {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "📝 نص فقط", callback_data: "broadcast_text" }],
+              [{ text: "🖼 صورة + نص", callback_data: "broadcast_image" }],
+              [{ text: "🔗 صورة + نص + زر", callback_data: "broadcast_image_button" }],
+              [{ text: "🔙 رجوع", callback_data: "admin_panel" }],
+            ],
+          },
+        });
+      }
+
+      if (data === "broadcast_text") {
+        setState(telegramId, { step: "broadcast_text" });
+        return bot.editMessageText("📝 أرسل نص الإذاعة:", {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: {
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast" }]],
+          },
+        });
+      }
+
+      if (data === "broadcast_image") {
+        setState(telegramId, { step: "broadcast_image_url", broadcastType: "image" });
+        return bot.editMessageText("🖼 أرسل رابط الصورة:", {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: {
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast" }]],
+          },
+        });
+      }
+
+      if (data === "broadcast_image_button") {
+        setState(telegramId, { step: "broadcast_image_url", broadcastType: "image_button" });
+        return bot.editMessageText("🖼 أرسل رابط الصورة:", {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: {
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast" }]],
+          },
+        });
+      }
+
+      if (data === "broadcast_confirm") {
+        const state = getState(telegramId);
+        if (!state || !state.broadcastData) return;
+        await sendBroadcast(chatId, telegramId, state.broadcastData);
+        return;
+      }
+
+      if (data === "broadcast_cancel") {
+        clearState(telegramId);
+        return showAdminPanel(chatId, messageId);
+      }
+
       if (data === "admin_groups") {
         const groupText = `⚙️ *إعدادات الكروبات*\n\n` +
           `كروب الإشعارات: ${notificationGroupId || "غير محدد"}\n` +
@@ -1123,7 +1306,7 @@ export function initBot(): TelegramBot {
         methods.forEach((m, i) => {
           text += `${i + 1}. ${m.name} ${m.isActive ? "✅" : "❌"}\n`;
         });
-        text += "\nلإضافة طريقة جديدة أرسل: اسم_الطريقة|التعليمات";
+        text += "\nلإضافة طريقة جديدة أرسل: اسم\\_الطريقة|التعليمات";
         setState(telegramId, { step: "admin_add_payment" });
 
         const buttons = methods.map((m) => [
@@ -1576,6 +1759,116 @@ export function initBot(): TelegramBot {
             inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
           },
         });
+      }
+
+      // Broadcast - text input
+      if (state.step === "broadcast_text" && msg.text) {
+        const broadcastData = { text: msg.text };
+        const userCount = await storage.getUserCount();
+        setState(telegramId, { step: "broadcast_confirm", broadcastData });
+        return bot.sendMessage(chatId,
+          `📢 *معاينة الإذاعة:*\n\n` +
+          `${msg.text}\n\n` +
+          `━━━━━━━━━━━━━━━\n` +
+          `👥 سيتم الإرسال إلى: ${userCount} مستخدم\n\n` +
+          `هل تريد الإرسال؟`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "✅ إرسال", callback_data: "broadcast_confirm" }],
+                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel" }],
+              ],
+            },
+          }
+        );
+      }
+
+      // Broadcast - image URL
+      if (state.step === "broadcast_image_url" && msg.text) {
+        const imageUrl = msg.text.trim();
+        if (!imageUrl.startsWith("http")) {
+          return bot.sendMessage(chatId, "❌ الرابط يجب أن يبدأ بـ http أو https");
+        }
+        setState(telegramId, { ...state, step: "broadcast_image_text", imageUrl });
+        return bot.sendMessage(chatId, "📝 أرسل النص المرافق للصورة (أو أرسل /skip لتخطي):");
+      }
+
+      // Broadcast - image caption text
+      if (state.step === "broadcast_image_text" && msg.text) {
+        const text = msg.text.trim() === "/skip" ? "" : msg.text;
+        if (state.broadcastType === "image_button") {
+          setState(telegramId, { ...state, step: "broadcast_button_text", text });
+          return bot.sendMessage(chatId, "🔗 أرسل نص الزر:");
+        }
+        const broadcastData = { text, imageUrl: state.imageUrl };
+        const userCount = await storage.getUserCount();
+        setState(telegramId, { step: "broadcast_confirm", broadcastData });
+
+        try {
+          await bot.sendPhoto(chatId, state.imageUrl, {
+            caption: `📢 *معاينة الإذاعة:*\n\n${text}`,
+            parse_mode: "Markdown",
+          });
+        } catch {
+          return bot.sendMessage(chatId, "❌ رابط الصورة غير صالح. أرسل رابط صحيح:");
+        }
+        return bot.sendMessage(chatId,
+          `👥 سيتم الإرسال إلى: ${userCount} مستخدم\n\nهل تريد الإرسال؟`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "✅ إرسال", callback_data: "broadcast_confirm" }],
+                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel" }],
+              ],
+            },
+          }
+        );
+      }
+
+      // Broadcast - button text
+      if (state.step === "broadcast_button_text" && msg.text) {
+        setState(telegramId, { ...state, step: "broadcast_button_url", buttonText: msg.text.trim() });
+        return bot.sendMessage(chatId, "🔗 أرسل رابط الزر:");
+      }
+
+      // Broadcast - button URL
+      if (state.step === "broadcast_button_url" && msg.text) {
+        const buttonUrl = msg.text.trim();
+        if (!buttonUrl.startsWith("http")) {
+          return bot.sendMessage(chatId, "❌ الرابط يجب أن يبدأ بـ http أو https");
+        }
+        const broadcastData = {
+          text: state.text || "",
+          imageUrl: state.imageUrl,
+          buttonText: state.buttonText,
+          buttonUrl,
+        };
+        const userCount = await storage.getUserCount();
+        setState(telegramId, { step: "broadcast_confirm", broadcastData });
+
+        try {
+          await bot.sendPhoto(chatId, state.imageUrl, {
+            caption: `📢 *معاينة الإذاعة:*\n\n${state.text || ""}`,
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [[{ text: state.buttonText, url: buttonUrl }]],
+            },
+          });
+        } catch {
+          return bot.sendMessage(chatId, "❌ رابط الصورة غير صالح.");
+        }
+        return bot.sendMessage(chatId,
+          `👥 سيتم الإرسال إلى: ${userCount} مستخدم\n\nهل تريد الإرسال؟`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "✅ إرسال", callback_data: "broadcast_confirm" }],
+                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel" }],
+              ],
+            },
+          }
+        );
       }
 
       // Add category

@@ -31,10 +31,18 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 
 ## Bot Commands
 - `/start` - Main menu
-- `/admin` - Admin panel (admin only)
+- `/admin` - Admin panel (admin only, includes broadcast feature)
 - `/editinsta`, `/edityoutube`, `/editfacebook`, `/edittiktok`, `/edittwitter`, `/edittelegram` - Edit category services (admin only)
 - `/setnotifygroup` - Set order notification group (in group, admin only)
 - `/setdepositgroup` - Set deposit approval group (in group, admin only)
+
+## Broadcast System
+- Available from both bot admin panel and web dashboard
+- Three types: text only, image+text, image+text+button
+- Rate limiting: 25 messages per batch, 35ms between messages, 1s between batches
+- Retry logic: Up to 3 retries with exponential backoff for rate-limited (429) errors
+- Auto-skip: Users who blocked the bot or deactivated accounts are skipped immediately
+- Live progress: Admin sees real-time sent/failed/total counts during broadcast
 
 ## Environment Variables
 - `TELEGRAM_BOT_TOKEN` - Bot token
