@@ -62,6 +62,8 @@ async function isAdmin(telegramId: string): Promise<boolean> {
   return user?.isAdmin === true;
 }
 
+const USD_TO_IQD = 1430;
+
 async function getProfitMargin(): Promise<number> {
   const margin = await storage.getSetting("profit_margin");
   return margin ? parseFloat(margin) : 15;
@@ -1818,7 +1820,7 @@ export function initBot(): TelegramBot {
           `📋 ${serviceInfo.name}\n` +
           `🌐 ${provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n` +
           `🆔 ${serviceInfo.service}\n` +
-          `💵 السعر: ${serviceInfo.rate} (+ ${margin}% ربح)`,
+          `💵 السعر: ${formatNumber(parseFloat(serviceInfo.rate))} IQD (+ ${margin}% ربح)`,
           {
             chat_id: chatId,
             message_id: messageId,
@@ -2305,20 +2307,32 @@ export function initBot(): TelegramBot {
           return bot.sendMessage(chatId, "❌ الخدمة غير موجودة في هذا الموقع.");
         }
 
-        // Select category
+        const originalRate = parseFloat(serviceInfo.rate);
+        let displayRate: string;
+        let convertedRate: string;
+
+        if (provider === "amazing") {
+          const iqdRate = originalRate * USD_TO_IQD;
+          convertedRate = iqdRate.toFixed(4);
+          displayRate = `${serviceInfo.rate} USD = ${formatNumber(iqdRate)} IQD`;
+        } else {
+          convertedRate = serviceInfo.rate;
+          displayRate = `${formatNumber(originalRate)} IQD`;
+        }
+
         const cats = await storage.getCategories();
         const buttons = cats.map((c) => [
           { text: c.name, callback_data: `assign_cat_${c.id}` },
         ]);
         buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
 
-        setState(telegramId, { step: "admin_select_category", serviceInfo, provider });
+        setState(telegramId, { step: "admin_select_category", serviceInfo: { ...serviceInfo, rate: convertedRate }, provider });
 
         return bot.sendMessage(
           chatId,
           `✅ *تم العثور على الخدمة:*\n\n` +
           `📋 ${serviceInfo.name}\n` +
-          `💵 السعر: ${serviceInfo.rate}\n` +
+          `💵 السعر: ${displayRate}\n` +
           `📊 الحد: ${serviceInfo.min} - ${serviceInfo.max}\n\n` +
           `اختر القسم:`,
           {

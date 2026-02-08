@@ -7,7 +7,7 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - **Backend**: Express.js server with PostgreSQL database (Drizzle ORM)
 - **Frontend**: React + Vite web admin dashboard with shadcn/ui components
 - **Bot**: node-telegram-bot-api with polling mode
-- **APIs**: SMM Panel API v2 integration with kd1s.com and amazingsmm.com
+- **APIs**: SMM Panel API v2 integration with kd1s.com (IQD pricing) and amazingsmm.com (USD pricing, auto-converted to IQD at 1:1430)
 
 ## Service Types
 - **SMM Services (سوشل ميديا)**: Provider-based services from kd1s.com/amazingsmm.com + custom support services added manually by admin
