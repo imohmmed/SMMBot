@@ -14,7 +14,9 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - **Subscriptions (اشتراكات)**: Manual subscription services (Netflix, Shahid, etc.) added by admin with fixed pricing
 - Categories have a `type` field: "smm" or "subscriptions"
 - Services have a `serviceType` field: "provider" (from API) or "custom" (manual, fixed price)
-- Custom services have a `price` field instead of `rate` and don't call external APIs when ordered
+- Custom SMM services use `rate` field (price per 1000) with min/max quantity, just like provider services
+- Subscription services use `price` field for fixed pricing (quantity always 1)
+- Custom services don't call external APIs when ordered
 
 ## Key Files
 - `server/bot.ts` - Main Telegram bot logic (commands, callbacks, message handlers)

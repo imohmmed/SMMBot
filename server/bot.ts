@@ -224,10 +224,12 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
       ],
     };
   } else if (svc.serviceType === "custom") {
-    const svcPrice = parseFloat(svc.price || "0");
+    const ratePerK = parseFloat(svc.rate || svc.price || "0");
     text = `🔹 *${svc.name}*\n\n` +
       `${svc.description ? `📝 ${svc.description}\n\n` : ""}` +
-      `💵 السعر: ${formatNumber(svcPrice)} IQD\n\n` +
+      `💵 السعر لكل 1000: ${formatNumber(ratePerK)} IQD\n` +
+      `📊 الحد الأدنى: ${svc.minQuantity}\n` +
+      `📊 الحد الأقصى: ${formatNumber(svc.maxQuantity)}\n\n` +
       `لتقديم طلب، أرسل الرابط أو المعلومات المطلوبة:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: true });
     keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]] };
@@ -770,7 +772,11 @@ async function showEditCategory(chatId: number, slug: string, telegramId: string
     if (svc.description) text += `   📝 ${svc.description}\n`;
     if (svc.serviceType === "custom") {
       text += `   🛠 خدمة خاصة\n`;
-      text += `   💵 السعر: ${formatNumber(svc.price || 0)} IQD\n`;
+      if (svc.rate) {
+        text += `   💵 السعر لكل 1000: ${formatNumber(svc.rate)} IQD\n`;
+      } else {
+        text += `   💵 السعر: ${formatNumber(svc.price || 0)} IQD\n`;
+      }
     } else {
       text += `   🌐 ${svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n`;
       text += `   🆔 آيدي الخدمة: ${svc.providerServiceId}\n`;
@@ -1750,27 +1756,10 @@ export function initBot(): TelegramBot {
         if (!svc) return;
 
         if (state.isCustom) {
-          const svcPrice = parseFloat(svc.price || "0");
-          setState(telegramId, { ...state, step: "order_confirm", link: msg.text, quantity: 1, price: svcPrice, cost: 0 });
-
+          setState(telegramId, { ...state, step: "order_quantity", link: msg.text });
           return bot.sendMessage(
             chatId,
-            `📋 *تأكيد الطلب*\n\n` +
-            `🔹 الخدمة: ${svc.name}\n` +
-            `🔗 المعلومات: ${msg.text}\n` +
-            `💵 المبلغ: ${formatNumber(svcPrice)} IQD\n\n` +
-            `هل تريد تأكيد الطلب؟`,
-            {
-              parse_mode: "Markdown",
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: "✅ تأكيد", callback_data: "confirm_order" },
-                    { text: "❌ إلغاء", callback_data: "main_menu" },
-                  ],
-                ],
-              },
-            }
+            `🔗 الرابط: ${msg.text}\n\n📊 أرسل الكمية المطلوبة:\n(الحد الأدنى: ${svc.minQuantity} - الحد الأقصى: ${formatNumber(svc.maxQuantity || 0)})`
           );
         }
 
@@ -1781,7 +1770,7 @@ export function initBot(): TelegramBot {
         );
       }
 
-      // Order flow - quantity (provider services only)
+      // Order flow - quantity
       if (state.step === "order_quantity" && msg.text) {
         const quantity = parseInt(msg.text);
         const svc = await storage.getService(state.serviceId);
@@ -1791,9 +1780,18 @@ export function initBot(): TelegramBot {
           return bot.sendMessage(chatId, `❌ الكمية غير صحيحة. يجب أن تكون بين ${svc.minQuantity} و ${formatNumber(svc.maxQuantity)}`);
         }
 
-        const margin = await getProfitMargin();
-        const price = calculatePrice(svc.rate || "0", quantity, margin);
-        const cost = (parseFloat(svc.rate || "0") / 1000) * quantity;
+        let price: number;
+        let cost: number;
+
+        if (svc.serviceType === "custom") {
+          const ratePerK = parseFloat(svc.rate || svc.price || "0");
+          price = (ratePerK / 1000) * quantity;
+          cost = 0;
+        } else {
+          const margin = await getProfitMargin();
+          price = calculatePrice(svc.rate || "0", quantity, margin);
+          cost = (parseFloat(svc.rate || "0") / 1000) * quantity;
+        }
 
         setState(telegramId, { ...state, step: "order_confirm", quantity, price, cost });
 
@@ -1943,15 +1941,35 @@ export function initBot(): TelegramBot {
       // Custom service flow - description
       if (state.step === "custom_service_desc" && msg.text) {
         const desc = msg.text === "/skip" ? null : msg.text.trim();
-        setState(telegramId, { ...state, step: "custom_service_price", serviceDescription: desc });
-        return bot.sendMessage(chatId, "💵 أرسل سعر الخدمة (بالدينار العراقي):");
+        setState(telegramId, { ...state, step: "custom_service_rate", serviceDescription: desc });
+        return bot.sendMessage(chatId, "💵 أرسل سعر الخدمة لكل 1000 (بالدينار العراقي):");
       }
 
-      // Custom service flow - price
-      if (state.step === "custom_service_price" && msg.text) {
-        const price = parseFloat(msg.text.replace(/,/g, ""));
-        if (isNaN(price) || price <= 0) {
+      // Custom service flow - rate per 1000
+      if (state.step === "custom_service_rate" && msg.text) {
+        const rate = parseFloat(msg.text.replace(/,/g, ""));
+        if (isNaN(rate) || rate <= 0) {
           return bot.sendMessage(chatId, "❌ أرسل سعر صحيح.");
+        }
+        setState(telegramId, { ...state, step: "custom_service_min", serviceRate: rate });
+        return bot.sendMessage(chatId, "📊 أرسل الحد الأدنى للطلب (مثال: 100):");
+      }
+
+      // Custom service flow - min quantity
+      if (state.step === "custom_service_min" && msg.text) {
+        const min = parseInt(msg.text.replace(/,/g, ""));
+        if (isNaN(min) || min <= 0) {
+          return bot.sendMessage(chatId, "❌ أرسل رقم صحيح.");
+        }
+        setState(telegramId, { ...state, step: "custom_service_max", serviceMin: min });
+        return bot.sendMessage(chatId, "📊 أرسل الحد الأقصى للطلب (مثال: 10000):");
+      }
+
+      // Custom service flow - max quantity
+      if (state.step === "custom_service_max" && msg.text) {
+        const max = parseInt(msg.text.replace(/,/g, ""));
+        if (isNaN(max) || max <= 0 || max < state.serviceMin) {
+          return bot.sendMessage(chatId, `❌ أرسل رقم صحيح أكبر من ${state.serviceMin}.`);
         }
 
         await storage.createService({
@@ -1961,10 +1979,10 @@ export function initBot(): TelegramBot {
           serviceType: "custom",
           provider: null,
           providerServiceId: null,
-          price: price.toString(),
-          rate: null,
-          minQuantity: 1,
-          maxQuantity: 1,
+          price: null,
+          rate: state.serviceRate.toString(),
+          minQuantity: state.serviceMin,
+          maxQuantity: max,
           isActive: true,
           totalOrders: 0,
           totalRevenue: "0",
@@ -1972,7 +1990,7 @@ export function initBot(): TelegramBot {
         });
 
         clearState(telegramId);
-        return bot.sendMessage(chatId, `✅ تم إضافة الخدمة "${state.serviceName}" بسعر ${formatNumber(price)} IQD`, {
+        return bot.sendMessage(chatId, `✅ تم إضافة الخدمة "${state.serviceName}"\n💵 السعر لكل 1000: ${formatNumber(state.serviceRate)} IQD\n📊 الحد الأدنى: ${state.serviceMin} - الأقصى: ${formatNumber(max)}`, {
           reply_markup: {
             inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
           },
