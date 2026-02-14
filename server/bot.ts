@@ -898,21 +898,27 @@ async function showAdminAdmins(chatId: number, messageId?: number) {
   }
 }
 
-async function showEditCategory(chatId: number, slug: string, telegramId: string) {
+async function showEditCategory(chatId: number, slug: string, telegramId: string, messageId?: number) {
   const cat = await storage.getCategoryBySlug(slug);
   if (!cat) {
-    return bot.sendMessage(chatId, "❌ القسم غير موجود.");
+    const errText = "❌ القسم غير موجود.";
+    if (messageId) {
+      return bot.editMessageText(errText, { chat_id: chatId, message_id: messageId });
+    }
+    return bot.sendMessage(chatId, errText);
   }
 
   const svcs = await storage.getServicesByCategory(cat.id);
 
   if (svcs.length === 0) {
-    return bot.sendMessage(chatId, `📂 *${cat.name}*\n\nلا توجد خدمات في هذا القسم.`, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [[{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
-      },
-    });
+    const emptyText = `📂 *${cat.name}*\n\nلا توجد خدمات في هذا القسم.`;
+    const emptyKeyboard = {
+      inline_keyboard: [[{ text: "رجوع ↩️", callback_data: "admin_edit_services", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+    };
+    if (messageId) {
+      return bot.editMessageText(emptyText, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: emptyKeyboard });
+    }
+    return bot.sendMessage(chatId, emptyText, { parse_mode: "Markdown", reply_markup: emptyKeyboard });
   }
 
   let text = `📂 *خدمات ${cat.name}:*\n\n`;
@@ -937,12 +943,28 @@ async function showEditCategory(chatId: number, slug: string, telegramId: string
   const buttons = svcs.map((s) => [
     { text: `✏️ تعديل ${s.name}`, callback_data: `edit_svc_${s.id}`, style: "primary" },
   ]);
-  buttons.push([{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }]);
+  buttons.push([{ text: "رجوع ↩️", callback_data: "admin_edit_services", style: "danger", icon_custom_emoji_id: "5875082500023258804" }]);
 
-  await bot.sendMessage(chatId, text, {
-    parse_mode: "Markdown",
-    reply_markup: { inline_keyboard: buttons },
-  });
+  if (messageId) {
+    try {
+      await bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: buttons },
+      });
+    } catch {
+      await bot.sendMessage(chatId, text, {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: buttons },
+      });
+    }
+  } else {
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "Markdown",
+      reply_markup: { inline_keyboard: buttons },
+    });
+  }
 }
 
 async function showAdminCodes(chatId: number, messageId?: number) {
@@ -1961,7 +1983,7 @@ export function initBot(): TelegramBot {
       // Edit category services (from admin edit services menu)
       if (data.startsWith("editcat_")) {
         const slug = data.replace("editcat_", "");
-        await showEditCategory(chatId, slug, telegramId);
+        await showEditCategory(chatId, slug, telegramId, messageId);
         return;
       }
 
