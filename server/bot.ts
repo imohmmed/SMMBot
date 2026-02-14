@@ -1,4 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
+import crypto from "crypto";
 import { storage } from "./storage";
 import * as smmApi from "./smm-api";
 import type { User, Service, Category, Order } from "@shared/schema";
@@ -19,6 +20,7 @@ process.on("unhandledRejection", (reason) => {
 
 let bot: TelegramBot;
 let botUserId: number | null = null;
+let botUsername: string = "";
 let notificationGroupId: string | null = null;
 let depositGroupId: string | null = null;
 let subscriptionGroupId: string | null = null;
@@ -298,7 +300,7 @@ async function showAccountInfo(chatId: number, telegramId: string, messageId?: n
   const user = await storage.getUserByTelegramId(telegramId);
   if (!user) return;
 
-  const text = `👤 *معلومات حسابك*\n\n` +
+  let text = `👤 *معلومات حسابك*\n\n` +
     `🆔 الآيدي: \`${user.telegramId}\`\n` +
     `👤 الاسم: ${user.firstName || ""} ${user.lastName || ""}\n` +
     `📱 اليوزر: ${user.username ? "@" + user.username : "غير محدد"}\n\n` +
@@ -306,6 +308,9 @@ async function showAccountInfo(chatId: number, telegramId: string, messageId?: n
     `💳 مجموع الإيداعات: ${formatNumber(user.totalDeposits)} IQD\n` +
     `🛒 مجموع المصروفات: ${formatNumber(user.totalSpent)} IQD\n` +
     `📦 عدد الطلبات: ${user.totalOrders}`;
+  if (user.discount > 0) {
+    text += `\n🏷 خصمك: ${user.discount}% (سوشل ميديا فقط)`;
+  }
 
   const keyboard = {
     inline_keyboard: [
@@ -556,8 +561,9 @@ async function showAdminPanel(chatId: number, messageId?: number) {
     [{ text: "📢 الإذاعة", callback_data: "admin_broadcast", style: "primary" }],
     [{ text: "👑 الأدمنية", callback_data: "admin_admins", style: "primary" }],
     [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories", style: "primary" }],
-    [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service", style: "primary" }, { text: "✏️ تعديل", callback_data: "admin_edit_services", style: "primary" }, { text: "🗑 حذف", callback_data: "admin_delete_services", style: "danger" }],
+    [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service", style: "success" }, { text: "✏️ تعديل", callback_data: "admin_edit_services", style: "primary" }, { text: "🗑 حذف", callback_data: "admin_delete_services", style: "danger" }],
     [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin", style: "primary" }, { text: "💳 طرق الدفع", callback_data: "admin_payments", style: "primary" }],
+    [{ text: "انشاء كودات", callback_data: "admin_codes", style: "success" }],
     [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups", style: "primary" }],
   ];
 
@@ -889,6 +895,62 @@ async function showEditCategory(chatId: number, slug: string, telegramId: string
   });
 }
 
+async function showAdminCodes(chatId: number, messageId?: number) {
+  const text = "🎟 *انشاء كودات*\n\nاختر نوع الكود:";
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: "💰 كود أموال", callback_data: "code_money", style: "success" }],
+      [{ text: "🏷 كود خصم", callback_data: "code_discount", style: "success" }],
+      [{ text: "👥 إدارة الخصومات", callback_data: "manage_discounts", style: "primary" }],
+      [{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+    ] as any,
+  };
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+}
+
+async function generateCodeLink(type: "money" | "discount", value: number): Promise<string> {
+  const token = crypto.randomBytes(16).toString("hex");
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+  await storage.createCode({
+    token,
+    type,
+    value: value.toString(),
+    used: false,
+    expiresAt,
+  });
+  return `https://t.me/${botUsername}?start=code_${token}`;
+}
+
+async function showManageDiscounts(chatId: number, messageId?: number) {
+  const discountUsers = await storage.getUsersWithDiscount();
+  let text = "👥 *إدارة الخصومات*\n\n";
+
+  if (discountUsers.length === 0) {
+    text += "لا يوجد مستخدمين لديهم خصومات حالياً.";
+  } else {
+    discountUsers.forEach((u, i) => {
+      text += `${i + 1}. ${u.firstName || ""} ${u.lastName || ""} (${u.telegramId}) - خصم: ${u.discount}%\n`;
+    });
+  }
+
+  const buttons: any[][] = discountUsers.map((u) => [
+    { text: `✏️ ${u.firstName || u.telegramId} (${u.discount}%)`, callback_data: `edit_discount_${u.id}`, style: "primary" },
+    { text: `❌ إزالة`, callback_data: `remove_discount_${u.id}`, style: "danger" },
+  ]);
+  buttons.push([{ text: "رجوع", callback_data: "admin_codes", style: "danger", icon_custom_emoji_id: "5875082500023258804" }]);
+
+  const keyboard = { inline_keyboard: buttons };
+  if (messageId) {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
+  } else {
+    await bot.sendMessage(chatId, text, { parse_mode: "Markdown", reply_markup: keyboard });
+  }
+}
+
 async function sendToUser(
   userId: string,
   broadcastData: { text?: string; imageUrl?: string; buttonText?: string; buttonUrl?: string },
@@ -1021,6 +1083,7 @@ export function initBot(): TelegramBot {
     try {
       const me = await bot.getMe();
       botUserId = me.id;
+      botUsername = me.username || "";
     } catch (e) {
       console.error("Failed to get bot info:", e);
     }
@@ -1029,10 +1092,90 @@ export function initBot(): TelegramBot {
     subscriptionGroupId = (await storage.getSetting("subscription_group_id")) || null;
   })();
 
-  // /start command
-  bot.onText(/\/start/, async (msg) => {
-    await ensureUser(msg);
-    await sendMainMenu(msg.chat.id);
+  // /start command with deep link support
+  bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
+    const user = await ensureUser(msg);
+    const chatId = msg.chat.id;
+    const telegramId = msg.from!.id.toString();
+    const payload = match?.[1]?.trim();
+
+    if (payload && payload.startsWith("code_")) {
+      const token = payload.replace("code_", "");
+      try {
+        const code = await storage.getCodeByToken(token);
+        if (!code) {
+          return bot.sendMessage(chatId, "❌ الكود غير صالح أو غير موجود.", {
+            reply_markup: {
+              inline_keyboard: [[{ text: "القائمة الرئيسية", callback_data: "main_menu", style: "primary" }] as any],
+            },
+          });
+        }
+
+        if (code.used) {
+          return bot.sendMessage(chatId, "❌ هذا الكود تم استخدامه مسبقاً.", {
+            reply_markup: {
+              inline_keyboard: [[{ text: "القائمة الرئيسية", callback_data: "main_menu", style: "primary" }] as any],
+            },
+          });
+        }
+
+        if (new Date() > new Date(code.expiresAt)) {
+          return bot.sendMessage(chatId, "❌ انتهت صلاحية هذا الكود.", {
+            reply_markup: {
+              inline_keyboard: [[{ text: "القائمة الرئيسية", callback_data: "main_menu", style: "primary" }] as any],
+            },
+          });
+        }
+
+        const dbUser = await storage.getUserByTelegramId(telegramId);
+        if (!dbUser) return;
+
+        await storage.markCodeUsed(code.id, dbUser.id);
+
+        if (code.type === "money") {
+          const amount = parseFloat(code.value);
+          await storage.updateUserBalance(dbUser.id, amount.toString());
+          await storage.createTransaction({
+            userId: dbUser.id,
+            type: "deposit",
+            amount: amount.toString(),
+            description: `كود أموال - ${formatNumber(amount)} IQD`,
+          });
+          return bot.sendMessage(
+            chatId,
+            `✅ *تم تفعيل كود الأموال بنجاح!*\n\n` +
+            `💰 المبلغ المضاف: ${formatNumber(amount)} IQD\n` +
+            `💳 رصيدك الجديد: ${formatNumber(parseFloat(dbUser.balance) + amount)} IQD`,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [[{ text: "القائمة الرئيسية", callback_data: "main_menu", style: "primary" }] as any],
+              },
+            }
+          );
+        } else if (code.type === "discount") {
+          const percent = parseInt(code.value);
+          await storage.updateUserDiscount(dbUser.id, percent);
+          return bot.sendMessage(
+            chatId,
+            `✅ *تم تفعيل كود الخصم بنجاح!*\n\n` +
+            `🏷 نسبة الخصم: ${percent}%\n` +
+            `📱 يطبق على خدمات السوشل ميديا فقط`,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [[{ text: "القائمة الرئيسية", callback_data: "main_menu", style: "primary" }] as any],
+              },
+            }
+          );
+        }
+      } catch (e) {
+        console.error("Error processing code:", e);
+        return bot.sendMessage(chatId, "❌ حدث خطأ في معالجة الكود.");
+      }
+    }
+
+    await sendMainMenu(chatId);
   });
 
   // /admin command
@@ -1460,7 +1603,60 @@ export function initBot(): TelegramBot {
       if (data === "admin_edit_services") return showAdminEditServices(chatId, messageId);
       if (data === "admin_delete_services") return showAdminDeleteServices(chatId, messageId);
       if (data === "admin_margin") return showAdminMargin(chatId, messageId);
+      if (data === "admin_codes") return showAdminCodes(chatId, messageId);
+      if (data === "manage_discounts") return showManageDiscounts(chatId, messageId);
       if (data === "admin_admins") return showAdminAdmins(chatId, messageId);
+
+      if (data === "code_money") {
+        setState(telegramId, { step: "code_money_amount" });
+        return bot.editMessageText("💰 *كود أموال*\n\nأدخل المبلغ المطلوب (IQD):", {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "رجوع", callback_data: "admin_codes", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+          },
+        });
+      }
+
+      if (data === "code_discount") {
+        setState(telegramId, { step: "code_discount_percent" });
+        return bot.editMessageText("🏷 *كود خصم*\n\nأدخل نسبة الخصم (مثال: 5 أو 10 أو 20):", {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "رجوع", callback_data: "admin_codes", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+          },
+        });
+      }
+
+      if (data.startsWith("edit_discount_")) {
+        const userId = parseInt(data.replace("edit_discount_", ""));
+        const targetUser = await storage.getUser(userId);
+        if (!targetUser) return;
+        setState(telegramId, { step: "edit_discount_value", targetUserId: userId });
+        return bot.editMessageText(
+          `✏️ *تعديل خصم*\n\n` +
+          `المستخدم: ${targetUser.firstName || ""} (${targetUser.telegramId})\n` +
+          `الخصم الحالي: ${targetUser.discount}%\n\n` +
+          `أدخل نسبة الخصم الجديدة (0 لإزالة الخصم):`,
+          {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [[{ text: "رجوع", callback_data: "manage_discounts", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+            },
+          }
+        );
+      }
+
+      if (data.startsWith("remove_discount_")) {
+        const userId = parseInt(data.replace("remove_discount_", ""));
+        await storage.updateUserDiscount(userId, 0);
+        return showManageDiscounts(chatId, messageId);
+      }
 
       if (data === "admin_broadcast") {
         const userCount = await storage.getUserCount();
@@ -2025,6 +2221,11 @@ export function initBot(): TelegramBot {
         let price: number;
         let cost: number;
 
+        const category = await storage.getCategory(svc.categoryId);
+        const isSmmService = category?.type === "smm";
+        const dbUser = await storage.getUserByTelegramId(telegramId);
+        const userDiscount = (isSmmService && dbUser?.discount) ? dbUser.discount : 0;
+
         if (svc.serviceType === "custom") {
           const ratePerK = parseFloat(svc.rate || svc.price || "0");
           price = (ratePerK / 1000) * quantity;
@@ -2035,16 +2236,30 @@ export function initBot(): TelegramBot {
           cost = (parseFloat(svc.rate || "0") / 1000) * quantity;
         }
 
+        let originalPrice = price;
+        if (userDiscount > 0) {
+          price = price * (1 - userDiscount / 100);
+        }
+
         setState(telegramId, { ...state, step: "order_confirm", quantity, price, cost });
+
+        let confirmText = `📋 *تأكيد الطلب*\n\n` +
+          `🔹 الخدمة: ${svc.name}\n` +
+          `🔗 الرابط: ${state.link}\n` +
+          `📊 الكمية: ${formatNumber(quantity)}\n`;
+
+        if (userDiscount > 0) {
+          confirmText += `💵 السعر الأصلي: ${formatNumber(originalPrice)} IQD\n` +
+            `🏷 الخصم: ${userDiscount}%\n` +
+            `💵 المبلغ بعد الخصم: ${formatNumber(price)} IQD\n\n`;
+        } else {
+          confirmText += `💵 المبلغ: ${formatNumber(price)} IQD\n\n`;
+        }
+        confirmText += `هل تريد تأكيد الطلب؟`;
 
         return bot.sendMessage(
           chatId,
-          `📋 *تأكيد الطلب*\n\n` +
-          `🔹 الخدمة: ${svc.name}\n` +
-          `🔗 الرابط: ${state.link}\n` +
-          `📊 الكمية: ${formatNumber(quantity)}\n` +
-          `💵 المبلغ: ${formatNumber(price)} IQD\n\n` +
-          `هل تريد تأكيد الطلب؟`,
+          confirmText,
           {
             parse_mode: "Markdown",
             reply_markup: {
@@ -2053,6 +2268,86 @@ export function initBot(): TelegramBot {
                   { text: "✅ تأكيد", callback_data: "confirm_order", style: "success" },
                   { text: "❌ إلغاء", callback_data: "main_menu", style: "danger" },
                 ],
+              ] as any,
+            },
+          }
+        );
+      }
+
+      // Code money amount
+      if (state.step === "code_money_amount" && msg.text) {
+        const amount = parseInt(msg.text.replace(/,/g, ""));
+        if (isNaN(amount) || amount < 1) {
+          return bot.sendMessage(chatId, "❌ المبلغ غير صحيح.");
+        }
+        clearState(telegramId);
+        const link = await generateCodeLink("money", amount);
+        return bot.sendMessage(
+          chatId,
+          `✅ *تم إنشاء كود أموال*\n\n` +
+          `💰 المبلغ: ${formatNumber(amount)} IQD\n` +
+          `⏱ الصلاحية: 5 دقائق\n` +
+          `🔗 استعمال مرة واحدة\n\n` +
+          `الرابط:\n\`${link}\``,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "إنشاء كود آخر", callback_data: "admin_codes", style: "success" }],
+                [{ text: "لوحة الإدارة", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+              ] as any,
+            },
+          }
+        );
+      }
+
+      // Code discount percent
+      if (state.step === "code_discount_percent" && msg.text) {
+        const percent = parseInt(msg.text);
+        if (isNaN(percent) || percent < 1 || percent > 100) {
+          return bot.sendMessage(chatId, "❌ النسبة غير صحيحة. يجب أن تكون بين 1 و 100.");
+        }
+        clearState(telegramId);
+        const link = await generateCodeLink("discount", percent);
+        return bot.sendMessage(
+          chatId,
+          `✅ *تم إنشاء كود خصم*\n\n` +
+          `🏷 نسبة الخصم: ${percent}%\n` +
+          `⏱ الصلاحية: 5 دقائق\n` +
+          `🔗 استعمال مرة واحدة\n` +
+          `📱 يطبق على خدمات السوشل ميديا فقط\n\n` +
+          `الرابط:\n\`${link}\``,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "إنشاء كود آخر", callback_data: "admin_codes", style: "success" }],
+                [{ text: "لوحة الإدارة", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+              ] as any,
+            },
+          }
+        );
+      }
+
+      // Edit discount value
+      if (state.step === "edit_discount_value" && msg.text) {
+        const percent = parseInt(msg.text);
+        if (isNaN(percent) || percent < 0 || percent > 100) {
+          return bot.sendMessage(chatId, "❌ النسبة غير صحيحة. يجب أن تكون بين 0 و 100.");
+        }
+        await storage.updateUserDiscount(state.targetUserId, percent);
+        clearState(telegramId);
+        const targetUser = await storage.getUser(state.targetUserId);
+        return bot.sendMessage(
+          chatId,
+          percent > 0
+            ? `✅ تم تحديث خصم المستخدم ${targetUser?.firstName || ""} إلى ${percent}%`
+            : `✅ تم إزالة الخصم من المستخدم ${targetUser?.firstName || ""}`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "👥 إدارة الخصومات", callback_data: "manage_discounts", style: "primary" }],
+                [{ text: "لوحة الإدارة", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
               ] as any,
             },
           }

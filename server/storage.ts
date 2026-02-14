@@ -7,10 +7,11 @@ import {
   type Transaction, type InsertTransaction,
   type Settings,
   type PaymentMethod, type InsertPaymentMethod,
-  users, categories, services, orders, deposits, transactions, settings, paymentMethods
+  type Code, type InsertCode,
+  users, categories, services, orders, deposits, transactions, settings, paymentMethods, codes
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, and, count, sum } from "drizzle-orm";
+import { eq, desc, sql, and, count, sum, gt, ne } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -74,6 +75,15 @@ export interface IStorage {
   getPaymentMethod(id: number): Promise<PaymentMethod | undefined>;
   createPaymentMethod(method: InsertPaymentMethod): Promise<PaymentMethod>;
   updatePaymentMethod(id: number, data: Partial<InsertPaymentMethod>): Promise<void>;
+
+  // Codes
+  createCode(code: InsertCode): Promise<Code>;
+  getCodeByToken(token: string): Promise<Code | undefined>;
+  markCodeUsed(id: number, userId: number): Promise<void>;
+
+  // User discount
+  updateUserDiscount(userId: number, discount: number): Promise<void>;
+  getUsersWithDiscount(): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -329,6 +339,30 @@ export class DatabaseStorage implements IStorage {
 
   async updatePaymentMethod(id: number, data: Partial<InsertPaymentMethod>): Promise<void> {
     await db.update(paymentMethods).set(data).where(eq(paymentMethods.id, id));
+  }
+
+  // Codes
+  async createCode(code: InsertCode): Promise<Code> {
+    const [created] = await db.insert(codes).values(code).returning();
+    return created;
+  }
+
+  async getCodeByToken(token: string): Promise<Code | undefined> {
+    const [code] = await db.select().from(codes).where(eq(codes.token, token));
+    return code;
+  }
+
+  async markCodeUsed(id: number, userId: number): Promise<void> {
+    await db.update(codes).set({ used: true, usedBy: userId }).where(eq(codes.id, id));
+  }
+
+  // User discount
+  async updateUserDiscount(userId: number, discount: number): Promise<void> {
+    await db.update(users).set({ discount }).where(eq(users.id, userId));
+  }
+
+  async getUsersWithDiscount(): Promise<User[]> {
+    return db.select().from(users).where(gt(users.discount, 0));
   }
 }
 

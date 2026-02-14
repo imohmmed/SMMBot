@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   totalDeposits: numeric("total_deposits", { precision: 12, scale: 2 }).notNull().default("0"),
   totalOrders: integer("total_orders").notNull().default(0),
   isAdmin: boolean("is_admin").notNull().default(false),
+  discount: integer("discount").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -97,6 +98,17 @@ export const paymentMethods = pgTable("payment_methods", {
   isActive: boolean("is_active").notNull().default(true),
 });
 
+export const codes = pgTable("codes", {
+  id: serial("id").primaryKey(),
+  token: varchar("token", { length: 100 }).notNull().unique(),
+  type: text("type").notNull(),
+  value: numeric("value", { precision: 12, scale: 2 }).notNull(),
+  usedBy: integer("used_by"),
+  used: boolean("used").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
@@ -105,6 +117,7 @@ export const insertDepositSchema = createInsertSchema(deposits).omit({ id: true,
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
 export const insertSettingsSchema = createInsertSchema(settings).omit({ id: true });
 export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({ id: true });
+export const insertCodeSchema = createInsertSchema(codes).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -121,3 +134,5 @@ export type Transaction = typeof transactions.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+export type Code = typeof codes.$inferSelect;
+export type InsertCode = z.infer<typeof insertCodeSchema>;
