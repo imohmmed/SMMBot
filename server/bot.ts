@@ -2426,8 +2426,7 @@ export function initBot(): TelegramBot {
         if (isNaN(rawAmount) || rawAmount < 1000 || rawAmount > 99999) {
           return bot.sendMessage(chatId, "❌ المبلغ غير صحيح. الحد الأدنى 1,000 والحد الأقصى 99,999 IQD");
         }
-        setState(telegramId, { step: "deposit_recharge_code", amount: rawAmount, methodId: state.methodId });
-        return bot.sendMessage(chatId, `✅ المبلغ: *${formatNumber(rawAmount)} IQD*\n\nأرسل رقم التعبئة بدون فوارز:`, { parse_mode: "Markdown" });
+        return promptScreenshot(chatId, telegramId, rawAmount, state.methodId);
       }
 
       // Deposit recharge code (non-USDT)
