@@ -108,7 +108,7 @@ async function showServices(chatId: number, messageId?: number) {
   const text = "📋 *اختر نوع الخدمة:*";
   const keyboard = {
     inline_keyboard: [
-      [{ text: "📱 سوشل ميديا", callback_data: "service_type_smm", style: "primary" }],
+      [{ text: "سوشل ميديا", callback_data: "service_type_smm", style: "primary", icon_custom_emoji_id: "5316856933318139919" }],
       [{ text: "📺 اشتراكات", callback_data: "service_type_subscriptions", style: "primary" }],
       [{ text: "رجوع", callback_data: "main_menu", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
     ] as any,
