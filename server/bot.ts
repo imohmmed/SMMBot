@@ -140,9 +140,21 @@ async function showServiceTypeCategories(chatId: number, type: string, messageId
     return bot.sendMessage(chatId, text, { reply_markup: keyboard });
   }
 
-  const buttons = cats.map((cat) => [
-    { text: `${cat.name}`, callback_data: `cat_${cat.id}`, style: "primary" },
-  ]);
+  const categoryEmojiMap: Record<string, string> = {
+    instagram: "5312476345849094587",
+    telegram: "5895442440302628590",
+    youtube: "4985489542027936396",
+    facebook: "5454340696183943190",
+    tiktok: "5359640777590841912",
+    twitter: "5895665336220388986",
+  };
+  const buttons = cats.map((cat) => {
+    const btn: any = { text: `${cat.name}`, callback_data: `cat_${cat.id}`, style: "primary" };
+    if (cat.slug && categoryEmojiMap[cat.slug]) {
+      btn.icon_custom_emoji_id = categoryEmojiMap[cat.slug];
+    }
+    return [btn];
+  });
   buttons.push([{ text: "رجوع", callback_data: "services", style: "danger", icon_custom_emoji_id: "5875082500023258804" }]);
 
   const title = type === "smm" ? "📱 *أقسام سوشل ميديا:*" : "📺 *أقسام الاشتراكات:*";
