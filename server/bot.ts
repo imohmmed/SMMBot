@@ -83,10 +83,10 @@ async function sendMainMenu(chatId: number, messageId?: number) {
   const text = "🌟 *مرحباً بك في بوت خدمات السوشل ميديا*\n\nاختر من القائمة أدناه:";
   const keyboard = {
     inline_keyboard: [
-      [{ text: "📋 الخدمات", callback_data: "services" }],
-      [{ text: "👤 معلومات حسابك", callback_data: "account_info" }, { text: "💰 شحن حسابك", callback_data: "deposit" }],
-      [{ text: "📦 طلباتي", callback_data: "my_orders" }],
-    ],
+      [{ text: "📋 الخدمات", callback_data: "services", style: "primary" }],
+      [{ text: "👤 معلومات حسابك", callback_data: "account_info", style: "primary" }, { text: "💰 شحن حسابك", callback_data: "deposit", style: "primary" }],
+      [{ text: "📦 طلباتي", callback_data: "my_orders", style: "primary" }],
+    ] as any,
   };
 
   if (messageId) {
@@ -108,10 +108,10 @@ async function showServices(chatId: number, messageId?: number) {
   const text = "📋 *اختر نوع الخدمة:*";
   const keyboard = {
     inline_keyboard: [
-      [{ text: "📱 سوشل ميديا", callback_data: "service_type_smm" }],
-      [{ text: "📺 اشتراكات", callback_data: "service_type_subscriptions" }],
-      [{ text: "🔙 رجوع", callback_data: "main_menu" }],
-    ],
+      [{ text: "📱 سوشل ميديا", callback_data: "service_type_smm", style: "primary" }],
+      [{ text: "📺 اشتراكات", callback_data: "service_type_subscriptions", style: "primary" }],
+      [{ text: "🔙 رجوع", callback_data: "main_menu", style: "danger" }],
+    ] as any,
   };
 
   if (messageId) {
@@ -133,7 +133,7 @@ async function showServiceTypeCategories(chatId: number, type: string, messageId
   const cats = await storage.getActiveCategoriesByType(type);
   if (cats.length === 0) {
     const text = "❌ لا توجد أقسام متاحة حالياً.";
-    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "services" }]] };
+    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "services", style: "danger" }] as any] };
     if (messageId) {
       return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, reply_markup: keyboard });
     }
@@ -141,9 +141,9 @@ async function showServiceTypeCategories(chatId: number, type: string, messageId
   }
 
   const buttons = cats.map((cat) => [
-    { text: `${cat.name}`, callback_data: `cat_${cat.id}` },
+    { text: `${cat.name}`, callback_data: `cat_${cat.id}`, style: "primary" },
   ]);
-  buttons.push([{ text: "🔙 رجوع", callback_data: "services" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "services", style: "danger" }]);
 
   const title = type === "smm" ? "📱 *أقسام سوشل ميديا:*" : "📺 *أقسام الاشتراكات:*";
   const catKeyboard = { inline_keyboard: buttons };
@@ -177,10 +177,10 @@ async function showCategoryServices(chatId: number, categoryId: number, messageI
   }
 
   const buttons = svcs.map((svc) => [
-    { text: `${svc.name}`, callback_data: `svc_${svc.id}` },
+    { text: `${svc.name}`, callback_data: `svc_${svc.id}`, style: "primary" },
   ]);
   const backCb = cat?.type === "subscriptions" ? "service_type_subscriptions" : "service_type_smm";
-  buttons.push([{ text: "🔙 رجوع للأقسام", callback_data: backCb }]);
+  buttons.push([{ text: "🔙 رجوع للأقسام", callback_data: backCb, style: "danger" }]);
 
   const text = `📂 *خدمات ${cat?.name || ""}:*`;
   const keyboard = { inline_keyboard: buttons };
@@ -221,9 +221,9 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
       `💵 السعر: ${formatNumber(svcPrice)} IQD`;
     keyboard = {
       inline_keyboard: [
-        [{ text: "🛒 طلب", callback_data: `order_subscription_${serviceId}` }],
-        [{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }],
-      ],
+        [{ text: "🛒 طلب", callback_data: `order_subscription_${serviceId}`, style: "success" }],
+        [{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}`, style: "danger" }],
+      ] as any,
     };
   } else if (svc.serviceType === "custom") {
     const ratePerK = parseFloat(svc.rate || svc.price || "0");
@@ -234,7 +234,7 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
       `📊 الحد الأقصى: ${formatNumber(svc.maxQuantity)}\n\n` +
       `لتقديم طلب، أرسل الرابط أو المعلومات المطلوبة:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: true });
-    keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]] };
+    keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}`, style: "danger" }] as any] };
   } else {
     const margin = await getProfitMargin();
     const pricePerK = parseFloat(svc.rate || "0") * (1 + margin / 100);
@@ -246,7 +246,7 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
       `🌐 الموقع: ${svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n\n` +
       `لتقديم طلب، أرسل الرابط المراد:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: false });
-    keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}` }]] };
+    keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}`, style: "danger" }] as any] };
   }
 
   if (messageId) {
@@ -279,9 +279,9 @@ async function showAccountInfo(chatId: number, telegramId: string, messageId?: n
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: "💸 تحويل أموال", callback_data: "transfer_money" }],
-      [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }],
-    ],
+      [{ text: "💸 تحويل أموال", callback_data: "transfer_money", style: "primary" }],
+      [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu", style: "danger" }],
+    ] as any,
   };
 
   if (messageId) {
@@ -308,9 +308,9 @@ async function showDepositOptions(chatId: number, messageId?: number) {
   }
 
   const buttons = methods.map((m) => [
-    { text: `${m.name}`, callback_data: `pay_${m.id}` },
+    { text: `${m.name}`, callback_data: `pay_${m.id}`, style: "primary" },
   ]);
-  buttons.push([{ text: "🔙 رجوع", callback_data: "main_menu" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "main_menu", style: "danger" }]);
 
   const text = "💰 *اختر طريقة الدفع:*";
   const keyboard = { inline_keyboard: buttons };
@@ -338,14 +338,14 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
 
   const buttons = [
     [
-      { text: "10,000 IQD", callback_data: `amount_${methodId}_10000` },
-      { text: "20,000 IQD", callback_data: `amount_${methodId}_20000` },
+      { text: "10,000 IQD", callback_data: `amount_${methodId}_10000`, style: "primary" },
+      { text: "20,000 IQD", callback_data: `amount_${methodId}_20000`, style: "primary" },
     ],
     [
-      { text: "50,000 IQD", callback_data: `amount_${methodId}_50000` },
-      { text: "100,000 IQD", callback_data: `amount_${methodId}_100000` },
+      { text: "50,000 IQD", callback_data: `amount_${methodId}_50000`, style: "primary" },
+      { text: "100,000 IQD", callback_data: `amount_${methodId}_100000`, style: "primary" },
     ],
-    [{ text: "🔙 رجوع", callback_data: "deposit" }],
+    [{ text: "🔙 رجوع", callback_data: "deposit", style: "danger" }],
   ];
 
   setState(telegramId, { step: "custom_amount", methodId });
@@ -384,7 +384,7 @@ async function showMyOrders(chatId: number, telegramId: string, messageId?: numb
   const userOrders = await storage.getOrdersByUser(user.id);
   if (userOrders.length === 0) {
     const text = "📦 لا توجد طلبات حالياً.";
-    const keyboard = { inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]] };
+    const keyboard = { inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu", style: "danger" }] as any] };
     if (messageId) {
       return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, reply_markup: keyboard });
     }
@@ -393,9 +393,9 @@ async function showMyOrders(chatId: number, telegramId: string, messageId?: numb
 
   const text = "📦 *هذه جميع الطلبات التي قمت بوضعها:*";
   const buttons = userOrders.slice(0, 20).map((o) => [
-    { text: `طلب #${getOrderDisplayId(o)} - ${o.status}`, callback_data: `order_${o.id}` },
+    { text: `طلب #${getOrderDisplayId(o)} - ${o.status}`, callback_data: `order_${o.id}`, style: "primary" },
   ]);
-  buttons.push([{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]);
+  buttons.push([{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu", style: "danger" }]);
 
   const keyboard = { inline_keyboard: buttons };
 
@@ -503,7 +503,7 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
     `📌 الحالة: ${statusMap[providerStatus] || providerStatus}\n` +
     `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
 
-  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع للطلبات", callback_data: "my_orders" }]] };
+  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع للطلبات", callback_data: "my_orders", style: "danger" }] as any] };
 
   if (messageId) {
     await bot.editMessageText(text, {
@@ -524,13 +524,13 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
 
 async function showAdminPanel(chatId: number, messageId?: number) {
   const buttons = [
-    [{ text: "📊 الإحصائيات", callback_data: "admin_stats" }],
-    [{ text: "📢 الإذاعة", callback_data: "admin_broadcast" }],
-    [{ text: "👑 الأدمنية", callback_data: "admin_admins" }],
-    [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories" }],
-    [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service" }, { text: "✏️ تعديل", callback_data: "admin_edit_services" }, { text: "🗑 حذف", callback_data: "admin_delete_services" }],
-    [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin" }, { text: "💳 طرق الدفع", callback_data: "admin_payments" }],
-    [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups" }],
+    [{ text: "📊 الإحصائيات", callback_data: "admin_stats", style: "primary" }],
+    [{ text: "📢 الإذاعة", callback_data: "admin_broadcast", style: "primary" }],
+    [{ text: "👑 الأدمنية", callback_data: "admin_admins", style: "primary" }],
+    [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories", style: "primary" }],
+    [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service", style: "primary" }, { text: "✏️ تعديل", callback_data: "admin_edit_services", style: "primary" }, { text: "🗑 حذف", callback_data: "admin_delete_services", style: "danger" }],
+    [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin", style: "primary" }, { text: "💳 طرق الدفع", callback_data: "admin_payments", style: "primary" }],
+    [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups", style: "primary" }],
   ];
 
   const text = "🔐 *لوحة الإدارة*";
@@ -588,7 +588,7 @@ async function showAdminStats(chatId: number, messageId?: number) {
     `المبالغ: ${formatNumber(subscriptionStats.totalAmount)} IQD\n` +
     `الأرباح: ${formatNumber(subscriptionStats.totalProfit)} IQD`;
 
-  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+  const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }] as any] };
   if (messageId) {
     await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
   } else {
@@ -627,15 +627,15 @@ async function showAdminCategories(chatId: number, messageId?: number) {
   text += "لإضافة قسم جديد اختر النوع:";
 
   const buttons = cats.map((c) => [
-    { text: `${c.isActive ? "❌ تعطيل" : "✅ تفعيل"} ${c.name}`, callback_data: `toggle_cat_${c.id}` },
+    { text: `${c.isActive ? "❌ تعطيل" : "✅ تفعيل"} ${c.name}`, callback_data: `toggle_cat_${c.id}`, style: c.isActive ? "danger" : "success" },
   ]);
   buttons.push([
-    { text: "📱 إضافة قسم سوشل ميديا", callback_data: "add_cat_smm" },
+    { text: "📱 إضافة قسم سوشل ميديا", callback_data: "add_cat_smm", style: "primary" },
   ]);
   buttons.push([
-    { text: "📺 إضافة قسم اشتراكات", callback_data: "add_cat_subscriptions" },
+    { text: "📺 إضافة قسم اشتراكات", callback_data: "add_cat_subscriptions", style: "primary" },
   ]);
-  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }]);
 
   const keyboard = { inline_keyboard: buttons };
   if (messageId) {
@@ -651,7 +651,7 @@ async function showAdminEditServices(chatId: number, messageId?: number) {
 
   if (activeCats.length === 0) {
     const text = "✏️ *تعديل الخدمات*\n\nلا توجد أقسام حالياً.";
-    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }] as any] };
     if (messageId) {
       return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
     }
@@ -666,15 +666,15 @@ async function showAdminEditServices(chatId: number, messageId?: number) {
   const buttons: any[][] = [];
   if (smmCats.length > 0) {
     smmCats.forEach(c => {
-      buttons.push([{ text: `📱 ${c.name}`, callback_data: `editcat_${c.slug}` }]);
+      buttons.push([{ text: `📱 ${c.name}`, callback_data: `editcat_${c.slug}`, style: "primary" }]);
     });
   }
   if (subCats.length > 0) {
     subCats.forEach(c => {
-      buttons.push([{ text: `📺 ${c.name}`, callback_data: `editcat_${c.slug}` }]);
+      buttons.push([{ text: `📺 ${c.name}`, callback_data: `editcat_${c.slug}`, style: "primary" }]);
     });
   }
-  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }]);
 
   const keyboard = { inline_keyboard: buttons };
   if (messageId) {
@@ -690,7 +690,7 @@ async function showAdminDeleteServices(chatId: number, messageId?: number) {
 
   if (activeCats.length === 0) {
     const text = "🗑 *حذف خدمة*\n\nلا توجد أقسام حالياً.";
-    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }] as any] };
     if (messageId) {
       return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
     }
@@ -702,12 +702,12 @@ async function showAdminDeleteServices(chatId: number, messageId?: number) {
 
   const buttons: any[][] = [];
   smmCats.forEach(c => {
-    buttons.push([{ text: `📱 ${c.name}`, callback_data: `delcat_${c.slug}` }]);
+    buttons.push([{ text: `📱 ${c.name}`, callback_data: `delcat_${c.slug}`, style: "primary" }]);
   });
   subCats.forEach(c => {
-    buttons.push([{ text: `📺 ${c.name}`, callback_data: `delcat_${c.slug}` }]);
+    buttons.push([{ text: `📺 ${c.name}`, callback_data: `delcat_${c.slug}`, style: "primary" }]);
   });
-  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }]);
 
   const text = "🗑 *حذف خدمة*\n\nاختر القسم:";
   const keyboard = { inline_keyboard: buttons };
@@ -728,7 +728,7 @@ async function showDeleteCategoryServices(chatId: number, slug: string, messageI
 
   if (svcs.length === 0) {
     const text = `📂 *${cat.name}*\n\nلا توجد خدمات في هذا القسم.`;
-    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_delete_services" }]] };
+    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_delete_services", style: "danger" }] as any] };
     if (messageId) {
       return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: keyboard });
     }
@@ -738,9 +738,9 @@ async function showDeleteCategoryServices(chatId: number, slug: string, messageI
   let text = `🗑 *حذف خدمة من ${cat.name}:*\n\nاختر الخدمة لحذفها:`;
 
   const buttons = svcs.map((s) => [
-    { text: `🗑 ${s.name}`, callback_data: `del_svc_${s.id}` },
+    { text: `🗑 ${s.name}`, callback_data: `del_svc_${s.id}`, style: "danger" },
   ]);
-  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_delete_services" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_delete_services", style: "danger" }]);
 
   if (messageId) {
     await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: { inline_keyboard: buttons } });
@@ -756,13 +756,13 @@ async function showAdminAddService(chatId: number, telegramId: string, messageId
   const addKeyboard = {
     inline_keyboard: [
       [
-        { text: "kd1s.com", callback_data: "provider_kd1s" },
-        { text: "amazingsmm.com", callback_data: "provider_amazing" },
+        { text: "kd1s.com", callback_data: "provider_kd1s", style: "primary" },
+        { text: "amazingsmm.com", callback_data: "provider_amazing", style: "primary" },
       ],
-      [{ text: "🛠 خدمة خاصة (يدوية)", callback_data: "provider_custom" }],
-      [{ text: "📺 اضافة اشتراك", callback_data: "provider_subscription" }],
-      [{ text: "🔙 رجوع", callback_data: "admin_panel" }],
-    ],
+      [{ text: "🛠 خدمة خاصة (يدوية)", callback_data: "provider_custom", style: "primary" }],
+      [{ text: "📺 اضافة اشتراك", callback_data: "provider_subscription", style: "primary" }],
+      [{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }],
+    ] as any,
   };
 
   if (messageId) {
@@ -776,7 +776,7 @@ async function showAdminMargin(chatId: number, messageId?: number) {
   const margin = await getProfitMargin();
 
   const marginText = `💹 *نسبة الأرباح الحالية: ${margin}%*\n\nأرسل النسبة الجديدة (رقم فقط):`;
-  const marginKeyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]] };
+  const marginKeyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }] as any] };
 
   if (messageId) {
     await bot.editMessageText(marginText, { chat_id: chatId, message_id: messageId, parse_mode: "Markdown", reply_markup: marginKeyboard });
@@ -802,9 +802,9 @@ async function showAdminAdmins(chatId: number, messageId?: number) {
 
   const removableAdmins = admins.filter((a) => a.telegramId !== CREATOR_ID);
   const buttons = removableAdmins.map((a) => [
-    { text: `❌ إزالة ${a.firstName || a.telegramId}`, callback_data: `remove_admin_${a.id}` },
+    { text: `❌ إزالة ${a.firstName || a.telegramId}`, callback_data: `remove_admin_${a.id}`, style: "danger" },
   ]);
-  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }]);
 
   const keyboard = { inline_keyboard: buttons };
   if (messageId) {
@@ -826,7 +826,7 @@ async function showEditCategory(chatId: number, slug: string, telegramId: string
     return bot.sendMessage(chatId, `📂 *${cat.name}*\n\nلا توجد خدمات في هذا القسم.`, {
       parse_mode: "Markdown",
       reply_markup: {
-        inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]],
+        inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }] as any],
       },
     });
   }
@@ -851,9 +851,9 @@ async function showEditCategory(chatId: number, slug: string, telegramId: string
   }
 
   const buttons = svcs.map((s) => [
-    { text: `✏️ تعديل ${s.name}`, callback_data: `edit_svc_${s.id}` },
+    { text: `✏️ تعديل ${s.name}`, callback_data: `edit_svc_${s.id}`, style: "primary" },
   ]);
-  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+  buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }]);
 
   await bot.sendMessage(chatId, text, {
     parse_mode: "Markdown",
@@ -918,7 +918,7 @@ async function sendBroadcast(
   );
 
   const inlineKeyboard = broadcastData.buttonText && broadcastData.buttonUrl
-    ? { reply_markup: { inline_keyboard: [[{ text: broadcastData.buttonText, url: broadcastData.buttonUrl }]] } }
+    ? { reply_markup: { inline_keyboard: [[{ text: broadcastData.buttonText, url: broadcastData.buttonUrl, style: "primary" }] as any] } }
     : {};
 
   let sent = 0;
@@ -962,7 +962,7 @@ async function sendBroadcast(
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]] },
+        reply_markup: { inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel", style: "danger" }] as any] },
       }
     );
   } catch {}
@@ -1084,9 +1084,9 @@ export function initBot(): TelegramBot {
               message_id: messageId,
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: "💰 شحن حسابك", callback_data: "deposit" }],
-                  [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }],
-                ],
+                  [{ text: "💰 شحن حسابك", callback_data: "deposit", style: "primary" }],
+                  [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu", style: "danger" }],
+                ] as any,
               },
             });
           }
@@ -1157,7 +1157,7 @@ export function initBot(): TelegramBot {
             {
               parse_mode: "Markdown",
               reply_markup: {
-                inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]],
+                inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu", style: "danger" }] as any],
               },
             }
           );
@@ -1165,14 +1165,14 @@ export function initBot(): TelegramBot {
           if (notificationGroupId) {
             const providerLabel = svc.serviceType === "custom" ? "خدمة خاصة" : (svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com");
             const groupButtons: any[][] = [
-              [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
+              [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}`, style: "primary" }],
             ];
             if (svc.serviceType === "custom") {
               groupButtons.push([
-                { text: "✅ تأكيد اكمال الطلب", callback_data: `complete_order_${order.id}` },
+                { text: "✅ تأكيد اكمال الطلب", callback_data: `complete_order_${order.id}`, style: "success" },
               ]);
               groupButtons.push([
-                { text: "❌ تأكيد الغاء الطلب", callback_data: `cancel_order_${order.id}` },
+                { text: "❌ تأكيد الغاء الطلب", callback_data: `cancel_order_${order.id}`, style: "danger" },
               ]);
             }
             await bot.sendMessage(
@@ -1220,9 +1220,9 @@ export function initBot(): TelegramBot {
             message_id: messageId,
             reply_markup: {
               inline_keyboard: [
-                [{ text: "💰 شحن حسابك", callback_data: "deposit" }],
-                [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }],
-              ],
+                [{ text: "💰 شحن حسابك", callback_data: "deposit", style: "primary" }],
+                [{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu", style: "danger" }],
+              ] as any,
             },
           });
         }
@@ -1269,7 +1269,7 @@ export function initBot(): TelegramBot {
           {
             parse_mode: "Markdown",
             reply_markup: {
-              inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu" }]],
+              inline_keyboard: [[{ text: "🔙 القائمة الرئيسية", callback_data: "main_menu", style: "danger" }] as any],
             },
           }
         );
@@ -1289,10 +1289,10 @@ export function initBot(): TelegramBot {
             {
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
-                  [{ text: "✅ تأكيد اكمال الطلب", callback_data: `complete_order_${order.id}` }],
-                  [{ text: "❌ تأكيد الغاء الطلب", callback_data: `cancel_order_${order.id}` }],
-                ],
+                  [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}`, style: "primary" }],
+                  [{ text: "✅ تأكيد اكمال الطلب", callback_data: `complete_order_${order.id}`, style: "success" }],
+                  [{ text: "❌ تأكيد الغاء الطلب", callback_data: `cancel_order_${order.id}`, style: "danger" }],
+                ] as any,
               },
             }
           );
@@ -1445,11 +1445,11 @@ export function initBot(): TelegramBot {
           parse_mode: "Markdown",
           reply_markup: {
             inline_keyboard: [
-              [{ text: "📝 نص فقط", callback_data: "broadcast_text" }],
-              [{ text: "🖼 صورة + نص", callback_data: "broadcast_image" }],
-              [{ text: "🔗 صورة + نص + زر", callback_data: "broadcast_image_button" }],
-              [{ text: "🔙 رجوع", callback_data: "admin_panel" }],
-            ],
+              [{ text: "📝 نص فقط", callback_data: "broadcast_text", style: "primary" }],
+              [{ text: "🖼 صورة + نص", callback_data: "broadcast_image", style: "primary" }],
+              [{ text: "🔗 صورة + نص + زر", callback_data: "broadcast_image_button", style: "primary" }],
+              [{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }],
+            ] as any,
           },
         });
       }
@@ -1460,7 +1460,7 @@ export function initBot(): TelegramBot {
           chat_id: chatId,
           message_id: messageId,
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast" }]],
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast", style: "danger" }] as any],
           },
         });
       }
@@ -1471,7 +1471,7 @@ export function initBot(): TelegramBot {
           chat_id: chatId,
           message_id: messageId,
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast" }]],
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast", style: "danger" }] as any],
           },
         });
       }
@@ -1482,7 +1482,7 @@ export function initBot(): TelegramBot {
           chat_id: chatId,
           message_id: messageId,
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast" }]],
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_broadcast", style: "danger" }] as any],
           },
         });
       }
@@ -1515,7 +1515,7 @@ export function initBot(): TelegramBot {
           message_id: messageId,
           parse_mode: "Markdown",
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel" }]],
+            inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }] as any],
           },
         });
       }
@@ -1530,9 +1530,9 @@ export function initBot(): TelegramBot {
         setState(telegramId, { step: "admin_add_payment" });
 
         const buttons = methods.map((m) => [
-          { text: `${m.isActive ? "❌ تعطيل" : "✅ تفعيل"} ${m.name}`, callback_data: `toggle_pay_${m.id}` },
+          { text: `${m.isActive ? "❌ تعطيل" : "✅ تفعيل"} ${m.name}`, callback_data: `toggle_pay_${m.id}`, style: m.isActive ? "danger" : "success" },
         ]);
-        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }]);
 
         return bot.editMessageText(text, {
           chat_id: chatId,
@@ -1583,9 +1583,9 @@ export function initBot(): TelegramBot {
         const cats = await storage.getCategories();
         const smmCats = cats.filter(c => c.type === "smm");
         const buttons = smmCats.map(c => [
-          { text: `📱 ${c.name}`, callback_data: `custom_cat_${c.id}` },
+          { text: `📱 ${c.name}`, callback_data: `custom_cat_${c.id}`, style: "primary" },
         ]);
-        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_add_service" }]);
+        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_add_service", style: "danger" }]);
         return bot.editMessageText("🛠 *إضافة خدمة خاصة*\n\nاختر القسم:", {
           chat_id: chatId,
           message_id: messageId,
@@ -1602,13 +1602,13 @@ export function initBot(): TelegramBot {
           return bot.editMessageText("❌ لا توجد أقسام اشتراكات. أضف قسم اشتراكات أولاً من إدارة الأقسام.", {
             chat_id: chatId,
             message_id: messageId,
-            reply_markup: { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_add_service" }]] },
+            reply_markup: { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_add_service", style: "danger" }] as any] },
           });
         }
         const buttons = subCats.map(c => [
-          { text: `📺 ${c.name}`, callback_data: `sub_cat_${c.id}` },
+          { text: `📺 ${c.name}`, callback_data: `sub_cat_${c.id}`, style: "primary" },
         ]);
-        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_add_service" }]);
+        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_add_service", style: "danger" }]);
         return bot.editMessageText("📺 *إضافة اشتراك*\n\nاختر القسم:", {
           chat_id: chatId,
           message_id: messageId,
@@ -1675,9 +1675,9 @@ export function initBot(): TelegramBot {
               parse_mode: "Markdown",
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: "✅ نعم، احذف", callback_data: `confirm_del_svc_${svcId}` }],
-                  [{ text: "❌ لا، رجوع", callback_data: "admin_delete_services" }],
-                ],
+                  [{ text: "✅ نعم، احذف", callback_data: `confirm_del_svc_${svcId}`, style: "success" }],
+                  [{ text: "❌ لا، رجوع", callback_data: "admin_delete_services", style: "danger" }],
+                ] as any,
               },
             }
           );
@@ -1696,7 +1696,7 @@ export function initBot(): TelegramBot {
               chat_id: chatId,
               message_id: messageId,
               reply_markup: {
-                inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_delete_services" }]],
+                inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "admin_delete_services", style: "danger" }] as any],
               },
             }
           );
@@ -1942,7 +1942,7 @@ export function initBot(): TelegramBot {
             message_id: messageId,
             parse_mode: "Markdown",
             reply_markup: {
-              inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
+              inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel", style: "danger" }] as any],
             },
           }
         );
@@ -2022,10 +2022,10 @@ export function initBot(): TelegramBot {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: "✅ تأكيد", callback_data: "confirm_order" },
-                  { text: "❌ إلغاء", callback_data: "main_menu" },
+                  { text: "✅ تأكيد", callback_data: "confirm_order", style: "success" },
+                  { text: "❌ إلغاء", callback_data: "main_menu", style: "danger" },
                 ],
-              ],
+              ] as any,
             },
           }
         );
@@ -2080,12 +2080,12 @@ export function initBot(): TelegramBot {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}` }],
+                [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}`, style: "primary" }],
                 [
-                  { text: "✅ تأكيد التحويل", callback_data: `approve_deposit_${deposit.id}` },
-                  { text: "❌ رفض التحويل", callback_data: `reject_deposit_${deposit.id}` },
+                  { text: "✅ تأكيد التحويل", callback_data: `approve_deposit_${deposit.id}`, style: "success" },
+                  { text: "❌ رفض التحويل", callback_data: `reject_deposit_${deposit.id}`, style: "danger" },
                 ],
-              ],
+              ] as any,
             },
           });
         }
@@ -2134,10 +2134,10 @@ export function initBot(): TelegramBot {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: "✅ نعم", callback_data: "confirm_transfer" },
-                  { text: "❌ لا", callback_data: "cancel_transfer" },
+                  { text: "✅ نعم", callback_data: "confirm_transfer", style: "success" },
+                  { text: "❌ لا", callback_data: "cancel_transfer", style: "danger" },
                 ],
-              ],
+              ] as any,
             },
           }
         );
@@ -2206,7 +2206,7 @@ export function initBot(): TelegramBot {
         clearState(telegramId);
         return bot.sendMessage(chatId, `✅ تم إضافة الخدمة "${state.serviceName}"\n💵 السعر لكل 1000: ${formatNumber(state.serviceRate)} IQD\n📊 الحد الأدنى: ${state.serviceMin} - الأقصى: ${formatNumber(max)}`, {
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
+            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel", style: "danger" }] as any],
           },
         });
       }
@@ -2251,7 +2251,7 @@ export function initBot(): TelegramBot {
         clearState(telegramId);
         return bot.sendMessage(chatId, `✅ تم إضافة الاشتراك "${state.serviceName}" بسعر ${formatNumber(price)} IQD`, {
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
+            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel", style: "danger" }] as any],
           },
         });
       }
@@ -2271,9 +2271,9 @@ export function initBot(): TelegramBot {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "✅ إرسال", callback_data: "broadcast_confirm" }],
-                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel" }],
-              ],
+                [{ text: "✅ إرسال", callback_data: "broadcast_confirm", style: "success" }],
+                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel", style: "danger" }],
+              ] as any,
             },
           }
         );
@@ -2313,9 +2313,9 @@ export function initBot(): TelegramBot {
           {
             reply_markup: {
               inline_keyboard: [
-                [{ text: "✅ إرسال", callback_data: "broadcast_confirm" }],
-                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel" }],
-              ],
+                [{ text: "✅ إرسال", callback_data: "broadcast_confirm", style: "success" }],
+                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel", style: "danger" }],
+              ] as any,
             },
           }
         );
@@ -2347,7 +2347,7 @@ export function initBot(): TelegramBot {
             caption: `📢 *معاينة الإذاعة:*\n\n${state.text || ""}`,
             parse_mode: "Markdown",
             reply_markup: {
-              inline_keyboard: [[{ text: state.buttonText, url: buttonUrl }]],
+              inline_keyboard: [[{ text: state.buttonText, url: buttonUrl, style: "primary" }] as any],
             },
           });
         } catch {
@@ -2358,9 +2358,9 @@ export function initBot(): TelegramBot {
           {
             reply_markup: {
               inline_keyboard: [
-                [{ text: "✅ إرسال", callback_data: "broadcast_confirm" }],
-                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel" }],
-              ],
+                [{ text: "✅ إرسال", callback_data: "broadcast_confirm", style: "success" }],
+                [{ text: "❌ إلغاء", callback_data: "broadcast_cancel", style: "danger" }],
+              ] as any,
             },
           }
         );
@@ -2387,7 +2387,7 @@ export function initBot(): TelegramBot {
         clearState(telegramId);
         return bot.sendMessage(chatId, `✅ تم تحديث نسبة الأرباح إلى ${margin}%`, {
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
+            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel", style: "danger" }] as any],
           },
         });
       }
@@ -2438,9 +2438,9 @@ export function initBot(): TelegramBot {
 
         const cats = await storage.getCategories();
         const buttons = cats.map((c) => [
-          { text: c.name, callback_data: `assign_cat_${c.id}` },
+          { text: c.name, callback_data: `assign_cat_${c.id}`, style: "primary" },
         ]);
-        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel" }]);
+        buttons.push([{ text: "🔙 رجوع", callback_data: "admin_panel", style: "danger" }]);
 
         setState(telegramId, { step: "admin_select_category", serviceInfo: { ...serviceInfo, rate: convertedRate }, provider });
 
@@ -2476,7 +2476,7 @@ export function initBot(): TelegramBot {
         clearState(telegramId);
         return bot.sendMessage(chatId, "✅ تم تحديث الخدمة بنجاح!", {
           reply_markup: {
-            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel" }]],
+            inline_keyboard: [[{ text: "🔙 لوحة الإدارة", callback_data: "admin_panel", style: "danger" }] as any],
           },
         });
       }
