@@ -91,8 +91,19 @@ export async function registerRoutes(
   // Deposits
   app.get("/api/deposits", async (req, res) => {
     try {
-      const deposits = await storage.getPendingDeposits();
-      res.json(deposits);
+      const allDeposits = await storage.getAllDeposits();
+      const allUsers = await storage.getAllUsers();
+      const usersMap = new Map(allUsers.map(u => [u.id, u]));
+      const depositsWithUser = allDeposits.map(d => ({
+        ...d,
+        user: usersMap.get(d.userId) ? {
+          telegramId: usersMap.get(d.userId)!.telegramId,
+          firstName: usersMap.get(d.userId)!.firstName,
+          lastName: usersMap.get(d.userId)!.lastName,
+          username: usersMap.get(d.userId)!.username,
+        } : null,
+      }));
+      res.json(depositsWithUser);
     } catch (error) {
       res.status(500).json({ message: "Error fetching deposits" });
     }

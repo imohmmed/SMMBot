@@ -56,6 +56,7 @@ export interface IStorage {
 
   // Deposits
   getDeposit(id: number): Promise<Deposit | undefined>;
+  getAllDeposits(): Promise<Deposit[]>;
   getPendingDeposits(): Promise<Deposit[]>;
   getDepositsByUser(userId: number): Promise<Deposit[]>;
   createDeposit(deposit: InsertDeposit): Promise<Deposit>;
@@ -276,6 +277,10 @@ export class DatabaseStorage implements IStorage {
   async getDeposit(id: number): Promise<Deposit | undefined> {
     const [deposit] = await db.select().from(deposits).where(eq(deposits.id, id));
     return deposit;
+  }
+
+  async getAllDeposits(): Promise<Deposit[]> {
+    return db.select().from(deposits).orderBy(desc(deposits.createdAt));
   }
 
   async getPendingDeposits(): Promise<Deposit[]> {

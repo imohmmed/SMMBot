@@ -14,6 +14,7 @@ import { ShoppingCart } from "lucide-react";
 
 interface Order {
   id: number;
+  sequentialId: number | null;
   userId: number;
   serviceId: number;
   providerOrderId: string | null;
@@ -25,6 +26,23 @@ interface Order {
   profit: string;
   status: string;
   createdAt: string;
+}
+
+function getOrderDisplayId(order: Order): string {
+  if (order.provider === "custom" || order.provider === "subscription") {
+    return order.sequentialId ? `#${order.sequentialId}` : `#${order.id}`;
+  }
+  return order.providerOrderId ? `#${order.providerOrderId}` : `#${order.id}`;
+}
+
+function getProviderLabel(provider: string): string {
+  switch (provider) {
+    case "kd1s": return "kd1s";
+    case "amazing": return "amazing";
+    case "custom": return "خدمة خاصة";
+    case "subscription": return "اشتراك";
+    default: return provider;
+  }
 }
 
 function formatNumber(num: string | number) {
@@ -86,10 +104,10 @@ export default function OrdersPage() {
                   const status = statusMap[order.status] || { label: order.status, variant: "secondary" as const };
                   return (
                     <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                      <TableCell className="font-mono">#{order.id}</TableCell>
+                      <TableCell className="font-mono">{getOrderDisplayId(order)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {order.provider === "kd1s" ? "kd1s" : "amazing"}
+                          {getProviderLabel(order.provider)}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate text-sm">{order.link}</TableCell>

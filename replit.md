@@ -30,6 +30,7 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - `client/src/pages/orders-page.tsx` - Orders table
 - `client/src/pages/services-page.tsx` - Services grid
 - `client/src/pages/broadcast-page.tsx` - Broadcast messages to all users
+- `client/src/pages/deposits-page.tsx` - Deposits history with status and user info
 
 ## Bot Commands
 - `/start` - Main menu
@@ -76,5 +77,13 @@ A Telegram bot for social media services (SMM panel) connected to two API provid
 - `CREATOR_TELEGRAM_ID` - Creator's Telegram ID (super admin)
 - `ADMIN_USERNAME` - Admin username for user contact
 
+## Web Dashboard Pages
+- Dashboard (/) - Stats overview with provider breakdown
+- Users (/users) - Users list with discount column
+- Orders (/orders) - Orders table with proper display IDs (sequentialId for custom, providerOrderId for API)
+- Deposits (/deposits) - All deposits history with status badges and user info
+- Services (/services) - Services grid grouped by category
+- Broadcast (/broadcast) - Send messages to all users
+
 ## Database Tables
-users, categories (with type: smm/subscriptions), services (with serviceType: provider/custom, price for custom), orders, deposits, transactions, settings, payment_methods
+users (with discount column), categories (with type: smm/subscriptions), services (with serviceType: provider/custom, price for custom), orders (with sequentialId), deposits, transactions, settings, payment_methods, codes

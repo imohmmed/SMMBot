@@ -23,6 +23,7 @@ interface User {
   totalDeposits: string;
   totalOrders: number;
   isAdmin: boolean;
+  discount: number;
   createdAt: string;
 }
 
@@ -65,6 +66,7 @@ export default function UsersPage() {
                   <TableHead className="text-right">الرصيد</TableHead>
                   <TableHead className="text-right">المصروفات</TableHead>
                   <TableHead className="text-right">الطلبات</TableHead>
+                  <TableHead className="text-right">الخصم</TableHead>
                   <TableHead className="text-right">الحالة</TableHead>
                 </TableRow>
               </TableHeader>
@@ -80,13 +82,20 @@ export default function UsersPage() {
                     <TableCell>{formatNumber(user.totalSpent)} IQD</TableCell>
                     <TableCell>{user.totalOrders}</TableCell>
                     <TableCell>
+                      {user.discount > 0 ? (
+                        <Badge variant="outline">{user.discount}%</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {user.isAdmin && <Badge variant="default">أدمن</Badge>}
                     </TableCell>
                   </TableRow>
                 ))}
                 {(!users || users.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       لا يوجد أعضاء بعد
                     </TableCell>
                   </TableRow>
