@@ -342,8 +342,14 @@ async function showDepositOptions(chatId: number, messageId?: number) {
     return bot.sendMessage(chatId, text);
   }
 
+  const emojiMap: Record<string, string> = {
+    usdt: "5280927938454244038",
+    mastercard: "5296433556371807395",
+    zaincash: "5280927938454244038",
+    asiacell: "5280813344431819469",
+  };
   const buttons = methods.map((m) => [
-    { text: `${m.name}`, callback_data: `pay_${m.id}`, style: "primary" },
+    { text: `${m.name}`, callback_data: `pay_${m.id}`, style: "primary", ...(emojiMap[m.slug] ? { icon_custom_emoji_id: emojiMap[m.slug] } : {}) },
   ]);
   buttons.push([{ text: "رجوع", callback_data: "main_menu", style: "danger", icon_custom_emoji_id: "5875082500023258804" }]);
 
