@@ -229,11 +229,13 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
   let text: string;
   let keyboard: any;
 
+  const escMdV2 = (s: string) => s.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+
   if (isSubscription) {
     const svcPrice = parseFloat(svc.price || "0");
-    text = `🔹 *${svc.name}*\n\n` +
-      `${svc.description ? `📝 ${svc.description}\n\n` : ""}` +
-      `💵 السعر: ${formatNumber(svcPrice)} IQD`;
+    text = `🔹 *${escMdV2(svc.name)}*\n\n` +
+      `${svc.description ? `![📝](tg://emoji?id=5197269100878907942) ${escMdV2(svc.description)}\n\n` : ""}` +
+      `![💵](tg://emoji?id=5287599246730611920) السعر: ${escMdV2(formatNumber(svcPrice))} IQD`;
     keyboard = {
       inline_keyboard: [
         [{ text: "🛒 طلب", callback_data: `order_subscription_${serviceId}`, style: "success" }],
@@ -242,22 +244,22 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
     };
   } else if (svc.serviceType === "custom") {
     const ratePerK = parseFloat(svc.rate || svc.price || "0");
-    text = `🔹 *${svc.name}*\n\n` +
-      `${svc.description ? `📝 ${svc.description}\n\n` : ""}` +
-      `💵 السعر لكل 1000: ${formatNumber(ratePerK)} IQD\n` +
-      `📊 الحد الأدنى: ${svc.minQuantity}\n` +
-      `📊 الحد الأقصى: ${formatNumber(svc.maxQuantity)}\n\n` +
+    text = `🔹 *${escMdV2(svc.name)}*\n\n` +
+      `${svc.description ? `![📝](tg://emoji?id=5197269100878907942) ${escMdV2(svc.description)}\n\n` : ""}` +
+      `![💵](tg://emoji?id=5287599246730611920) السعر لكل 1000: ${escMdV2(formatNumber(ratePerK))} IQD\n` +
+      `![📊](tg://emoji?id=5447183459602669338) الحد الأدنى: ${escMdV2(String(svc.minQuantity))}\n` +
+      `![📊](tg://emoji?id=5449683594425410231) الحد الأقصى: ${escMdV2(formatNumber(svc.maxQuantity))}\n\n` +
       `لتقديم طلب، أرسل الرابط أو المعلومات المطلوبة:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: true });
     keyboard = { inline_keyboard: [[{ text: "رجوع", callback_data: `cat_${svc.categoryId}`, style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any] };
   } else {
     const margin = await getProfitMargin();
     const pricePerK = parseFloat(svc.rate || "0") * (1 + margin / 100);
-    text = `🔹 *${svc.name}*\n\n` +
-      `${svc.description ? `📝 ${svc.description}\n\n` : ""}` +
-      `💵 السعر لكل 1000: ${formatNumber(pricePerK)}\n` +
-      `📊 الحد الأدنى: ${svc.minQuantity}\n` +
-      `📊 الحد الأقصى: ${formatNumber(svc.maxQuantity)}\n\n` +
+    text = `🔹 *${escMdV2(svc.name)}*\n\n` +
+      `${svc.description ? `![📝](tg://emoji?id=5197269100878907942) ${escMdV2(svc.description)}\n\n` : ""}` +
+      `![💵](tg://emoji?id=5287599246730611920) السعر لكل 1000: ${escMdV2(formatNumber(pricePerK))}\n` +
+      `![📊](tg://emoji?id=5447183459602669338) الحد الأدنى: ${escMdV2(String(svc.minQuantity))}\n` +
+      `![📊](tg://emoji?id=5449683594425410231) الحد الأقصى: ${escMdV2(formatNumber(svc.maxQuantity))}\n\n` +
       `لتقديم طلب، أرسل الرابط المراد:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: false });
     keyboard = { inline_keyboard: [[{ text: "رجوع", callback_data: `cat_${svc.categoryId}`, style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any] };
@@ -267,12 +269,12 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2",
       reply_markup: keyboard,
     });
   } else {
     await bot.sendMessage(chatId, text, {
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2",
       reply_markup: keyboard,
     });
   }
