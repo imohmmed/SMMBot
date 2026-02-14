@@ -83,9 +83,9 @@ async function sendMainMenu(chatId: number, messageId?: number) {
   const text = "🌟 *مرحباً بك في بوت خدمات السوشل ميديا*\n\nاختر من القائمة أدناه:";
   const keyboard = {
     inline_keyboard: [
-      [{ text: "📋 الخدمات", callback_data: "services" }],
-      [{ text: "👤 معلومات حسابك", callback_data: "account_info" }, { text: "💰 شحن حسابك", callback_data: "deposit" }],
-      [{ text: "📦 طلباتي", callback_data: "my_orders" }],
+      [{ text: "🔵 الخدمات", callback_data: "services" }],
+      [{ text: "🔵 معلومات حسابك", callback_data: "account_info" }, { text: "🔵 شحن حسابك", callback_data: "deposit" }],
+      [{ text: "🔵 طلباتي", callback_data: "my_orders" }],
     ],
   };
 
@@ -108,9 +108,9 @@ async function showServices(chatId: number, messageId?: number) {
   const text = "📋 *اختر نوع الخدمة:*";
   const keyboard = {
     inline_keyboard: [
-      [{ text: "📱 سوشل ميديا", callback_data: "service_type_smm" }],
-      [{ text: "📺 اشتراكات", callback_data: "service_type_subscriptions" }],
-      [{ text: "🔙 رجوع", callback_data: "main_menu" }],
+      [{ text: "🔵 سوشل ميديا", callback_data: "service_type_smm" }],
+      [{ text: "🔵 اشتراكات", callback_data: "service_type_subscriptions" }],
+      [{ text: "🔵 رجوع", callback_data: "main_menu" }],
     ],
   };
 
@@ -133,7 +133,7 @@ async function showServiceTypeCategories(chatId: number, type: string, messageId
   const cats = await storage.getActiveCategoriesByType(type);
   if (cats.length === 0) {
     const text = "❌ لا توجد أقسام متاحة حالياً.";
-    const keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: "services" }]] };
+    const keyboard = { inline_keyboard: [[{ text: "🔵 رجوع", callback_data: "services" }]] };
     if (messageId) {
       return bot.editMessageText(text, { chat_id: chatId, message_id: messageId, reply_markup: keyboard });
     }
@@ -141,9 +141,9 @@ async function showServiceTypeCategories(chatId: number, type: string, messageId
   }
 
   const buttons = cats.map((cat) => [
-    { text: `${cat.name}`, callback_data: `cat_${cat.id}` },
+    { text: `🔵 ${cat.name}`, callback_data: `cat_${cat.id}` },
   ]);
-  buttons.push([{ text: "🔙 رجوع", callback_data: "services" }]);
+  buttons.push([{ text: "🔵 رجوع", callback_data: "services" }]);
 
   const title = type === "smm" ? "📱 *أقسام سوشل ميديا:*" : "📺 *أقسام الاشتراكات:*";
   const catKeyboard = { inline_keyboard: buttons };
@@ -177,10 +177,10 @@ async function showCategoryServices(chatId: number, categoryId: number, messageI
   }
 
   const buttons = svcs.map((svc) => [
-    { text: `${svc.name}`, callback_data: `svc_${svc.id}` },
+    { text: `🔵 ${svc.name}`, callback_data: `svc_${svc.id}` },
   ]);
   const backCb = cat?.type === "subscriptions" ? "service_type_subscriptions" : "service_type_smm";
-  buttons.push([{ text: "🔙 رجوع للأقسام", callback_data: backCb }]);
+  buttons.push([{ text: "🔵 رجوع للأقسام", callback_data: backCb }]);
 
   const text = `📂 *خدمات ${cat?.name || ""}:*`;
   const keyboard = { inline_keyboard: buttons };
