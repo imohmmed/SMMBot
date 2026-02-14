@@ -372,7 +372,7 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
   const isUsdt = method.slug === "usdt" || method.name.toLowerCase().includes("usdt");
 
   const text = `💳 *${method.name}*\n\n${method.instructions}\n\n` +
-    (isUsdt ? `💵 سعر الصرف: 1 USDT = ${formatNumber(USD_TO_IQD)} IQD\n\n` : ``) +
+    (isUsdt ? `💵 سعر صرف 1 دولار = ${formatNumber(USD_TO_IQD)} دينار عراقي\n\n` : ``) +
     `🤑 *اختر المبلغ:*`;
 
   let buttons;
