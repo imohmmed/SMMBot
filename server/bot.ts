@@ -197,19 +197,33 @@ async function showCategoryServices(chatId: number, categoryId: number, messageI
   const backCb = cat?.type === "subscriptions" ? "service_type_subscriptions" : "service_type_smm";
   buttons.push([{ text: "رجوع للأقسام", callback_data: backCb, style: "danger", icon_custom_emoji_id: "5875082500023258804" }]);
 
-  const text = `📂 *خدمات ${cat?.name || ""}:*`;
+  const catEmojiMap: Record<string, string> = {
+    instagram: "5312476345849094587",
+    telegram: "5895442440302628590",
+    youtube: "4985489542027936396",
+    facebook: "5454340696183943190",
+    tiktok: "5359640777590841912",
+    twitter: "5895665336220388986",
+  };
+  const catSlug = cat?.slug || "";
+  const catEmoji = catEmojiMap[catSlug];
+  const catNameEsc = (cat?.name || "").replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+  const text = catEmoji
+    ? `![📂](tg://emoji?id=${catEmoji}) *خدمات ${catNameEsc}:*`
+    : `📂 *خدمات ${catNameEsc}:*`;
   const keyboard = { inline_keyboard: buttons };
+  const parseMode = catEmoji ? "MarkdownV2" : "Markdown";
 
   if (messageId) {
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: "Markdown",
+      parse_mode: parseMode,
       reply_markup: keyboard,
     });
   } else {
     await bot.sendMessage(chatId, text, {
-      parse_mode: "Markdown",
+      parse_mode: parseMode,
       reply_markup: keyboard,
     });
   }
