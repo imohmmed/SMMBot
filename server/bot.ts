@@ -80,7 +80,7 @@ function calculatePrice(rate: string, quantity: number, margin: number): number 
 }
 
 async function sendMainMenu(chatId: number, messageId?: number) {
-  const text = "🌟 *مرحباً بك في بوت خدمات السوشل ميديا*\n\nاختر من القائمة أدناه:";
+  const text = "![🌟](tg://emoji?id=5287640096164564000) *مرحباً بك في بوت خدمات السوشل ميديا*\n\nاختر من القائمة أدناه:";
   const keyboard = {
     inline_keyboard: [
       [{ text: "الخدمات", callback_data: "services", style: "primary", icon_custom_emoji_id: "5312361253610475399" }],
@@ -93,12 +93,12 @@ async function sendMainMenu(chatId: number, messageId?: number) {
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2",
       reply_markup: keyboard,
     });
   } else {
     await bot.sendMessage(chatId, text, {
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2",
       reply_markup: keyboard,
     });
   }
