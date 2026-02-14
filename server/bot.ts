@@ -242,8 +242,7 @@ async function showServiceDetail(chatId: number, serviceId: number, telegramId: 
       `${svc.description ? `📝 ${svc.description}\n\n` : ""}` +
       `💵 السعر لكل 1000: ${formatNumber(pricePerK)}\n` +
       `📊 الحد الأدنى: ${svc.minQuantity}\n` +
-      `📊 الحد الأقصى: ${formatNumber(svc.maxQuantity)}\n` +
-      `🌐 الموقع: ${svc.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}\n\n` +
+      `📊 الحد الأقصى: ${formatNumber(svc.maxQuantity)}\n\n` +
       `لتقديم طلب، أرسل الرابط المراد:`;
     setState(telegramId, { step: "order_link", serviceId, isCustom: false });
     keyboard = { inline_keyboard: [[{ text: "🔙 رجوع", callback_data: `cat_${svc.categoryId}`, style: "danger" }] as any] };
@@ -493,13 +492,11 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
   };
 
   const displayId = getOrderDisplayId(order);
-  const providerLine = order.provider === "custom" ? "🛠 خدمة خاصة" : `🌐 الموقع: ${order.provider === "kd1s" ? "kd1s.com" : "amazingsmm.com"}`;
   const text = `📦 *تفاصيل الطلب #${displayId}*\n\n` +
     `📋 الخدمة: ${svc?.name || "غير معروف"}\n` +
     `${order.link !== "اشتراك" ? `🔗 الرابط: ${order.link}\n` : ""}` +
     `📊 الكمية: ${formatNumber(order.quantity)}\n` +
     `💵 المبلغ: ${formatNumber(order.amount)} IQD\n` +
-    `${providerLine}\n` +
     `📌 الحالة: ${statusMap[providerStatus] || providerStatus}\n` +
     `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
 
