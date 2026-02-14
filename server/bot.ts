@@ -377,8 +377,21 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
 
   const isUsdt = method.slug === "usdt" || method.name.toLowerCase().includes("usdt");
 
-  const text = `💳 *${method.name}*\n\n${method.instructions}\n\n` +
-    (isUsdt ? `💵 سعر صرف 1 دولار = ${formatNumber(USD_TO_IQD)} دينار عراقي\n\n` : ``) +
+  const emojiMap: Record<string, string> = {
+    usdt: "5215437796088499410",
+    mastercard: "5296433556371807395",
+    zaincash: "5280927938454244038",
+    asiacell: "5280813344431819469",
+  };
+  const emojiId = emojiMap[method.slug] || "";
+  const customEmoji = emojiId ? `![⭐](tg://emoji?id=${emojiId}) ` : "";
+
+  function escMd2(str: string) {
+    return str.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+  }
+
+  const text = `${customEmoji}*${escMd2(method.name)}*\n\n${escMd2(method.instructions)}\n\n` +
+    (isUsdt ? `💵 سعر صرف 1 دولار \\= ${formatNumber(USD_TO_IQD)} دينار عراقي\n\n` : ``) +
     `🤑 *اختر المبلغ:*`;
 
   let buttons;
@@ -422,12 +435,12 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2",
       reply_markup: keyboard,
     });
   } else {
     await bot.sendMessage(chatId, text, {
-      parse_mode: "Markdown",
+      parse_mode: "MarkdownV2",
       reply_markup: keyboard,
     });
   }
