@@ -343,7 +343,7 @@ async function showDepositOptions(chatId: number, messageId?: number) {
   }
 
   const emojiMap: Record<string, string> = {
-    usdt: "5280927938454244038",
+    usdt: "5215437796088499410",
     mastercard: "5296433556371807395",
     zaincash: "5280927938454244038",
     asiacell: "5280813344431819469",
