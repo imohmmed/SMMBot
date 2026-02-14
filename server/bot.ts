@@ -84,7 +84,7 @@ async function sendMainMenu(chatId: number, messageId?: number) {
   const keyboard = {
     inline_keyboard: [
       [{ text: "الخدمات", callback_data: "services", style: "primary", icon_custom_emoji_id: "5312361253610475399" }],
-      [{ text: "👤 معلومات حسابك", callback_data: "account_info", style: "primary" }, { text: "💰 شحن حسابك", callback_data: "deposit", style: "primary" }],
+      [{ text: "👤 معلومات حسابك", callback_data: "account_info", style: "primary" }, { text: "شحن حسابك", callback_data: "deposit", style: "primary", icon_custom_emoji_id: "5879991085001871624" }],
       [{ text: "📦 طلباتي", callback_data: "my_orders", style: "primary" }],
     ] as any,
   };
