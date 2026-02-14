@@ -64,7 +64,7 @@ async function isAdmin(telegramId: string): Promise<boolean> {
   return user?.isAdmin === true;
 }
 
-const USD_TO_IQD = 1430;
+const USD_TO_IQD = 1400;
 
 async function getProfitMargin(): Promise<number> {
   const margin = await storage.getSetting("profit_margin");
@@ -369,7 +369,11 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
   const method = await storage.getPaymentMethod(methodId);
   if (!method) return;
 
-  const text = `💳 *${method.name}*\n\n${method.instructions}\n\n💵 *اختر المبلغ أو اكتب المبلغ المطلوب:*`;
+  const isUsdt = method.slug === "usdt" || method.name.toLowerCase().includes("usdt");
+
+  const text = `💳 *${method.name}*\n\n${method.instructions}\n\n` +
+    (isUsdt ? `💵 سعر الصرف: 1 USDT = ${formatNumber(USD_TO_IQD)} IQD\n\n` : ``) +
+    `بعد التحويل أرسل سكرين شوت\n\n🤑 *اختر المبلغ أو اكتب المبلغ المطلوب:*`;
 
   const buttons = [
     [
@@ -378,12 +382,15 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
     ],
     [
       { text: "50,000 IQD", callback_data: `amount_${methodId}_50000`, style: "primary" },
-      { text: "100,000 IQD", callback_data: `amount_${methodId}_100000`, style: "primary" },
+      { text: "75,000 IQD", callback_data: `amount_${methodId}_75000`, style: "primary" },
     ],
-    [{ text: "رجوع", callback_data: "deposit", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+    [
+      { text: "مبلغ اختياري", callback_data: `custom_amount_${methodId}`, style: "success" },
+    ],
+    [{ text: "رجوع ↩", callback_data: "deposit", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
   ];
 
-  setState(telegramId, { step: "custom_amount", methodId });
+  clearState(telegramId);
 
   const keyboard = { inline_keyboard: buttons };
 
@@ -402,14 +409,25 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
   }
 }
 
-async function promptScreenshot(chatId: number, telegramId: string, amount: number, methodId: number) {
-  setState(telegramId, { step: "deposit_screenshot", amount, methodId });
+async function promptRechargeOrScreenshot(chatId: number, telegramId: string, amount: number, methodId: number) {
+  const method = await storage.getPaymentMethod(methodId);
+  const isUsdt = method && (method.slug === "usdt" || method.name.toLowerCase().includes("usdt"));
 
-  await bot.sendMessage(
-    chatId,
-    `✅ المبلغ: *${formatNumber(amount)} IQD*\n\nالآن أرسل *سكرين شوت* لعملية التحويل:`,
-    { parse_mode: "Markdown" }
-  );
+  if (isUsdt) {
+    setState(telegramId, { step: "deposit_screenshot", amount, methodId });
+    await bot.sendMessage(
+      chatId,
+      `✅ المبلغ: *${formatNumber(amount)} IQD*\n\nالآن أرسل *سكرين شوت* لعملية التحويل:`,
+      { parse_mode: "Markdown" }
+    );
+  } else {
+    setState(telegramId, { step: "deposit_recharge_code", amount, methodId });
+    await bot.sendMessage(
+      chatId,
+      `✅ المبلغ: *${formatNumber(amount)} IQD*\n\nأرسل رقم التعبئة بدون فوارز:`,
+      { parse_mode: "Markdown" }
+    );
+  }
 }
 
 async function showMyOrders(chatId: number, telegramId: string, messageId?: number) {
@@ -1525,12 +1543,21 @@ export function initBot(): TelegramBot {
         return showPaymentMethod(chatId, methodId, telegramId, messageId);
       }
 
+      // Custom amount button
+      if (data.startsWith("custom_amount_")) {
+        const methodId = parseInt(data.split("_")[2]);
+        setState(telegramId, { step: "custom_amount", methodId });
+        return bot.sendMessage(chatId, "💵 أرسل المبلغ المطلوب (بالدينار العراقي):", {
+          parse_mode: "Markdown",
+        });
+      }
+
       // Amount selection
       if (data.startsWith("amount_")) {
         const parts = data.split("_");
         const methodId = parseInt(parts[1]);
         const amount = parseInt(parts[2]);
-        return promptScreenshot(chatId, telegramId, amount, methodId);
+        return promptRechargeOrScreenshot(chatId, telegramId, amount, methodId);
       }
 
       // Transfer money
@@ -2357,10 +2384,24 @@ export function initBot(): TelegramBot {
       // Custom deposit amount
       if (state.step === "custom_amount" && msg.text) {
         const amount = parseInt(msg.text.replace(/,/g, ""));
-        if (isNaN(amount) || amount < 1000) {
-          return bot.sendMessage(chatId, "❌ المبلغ غير صحيح. الحد الأدنى 1,000 IQD");
+        if (isNaN(amount) || amount < 1000 || amount > 99999) {
+          return bot.sendMessage(chatId, "❌ المبلغ غير صحيح. الحد الأدنى 1,000 والحد الأقصى 99,999 IQD");
         }
-        return promptScreenshot(chatId, telegramId, amount, state.methodId);
+        return promptRechargeOrScreenshot(chatId, telegramId, amount, state.methodId);
+      }
+
+      // Deposit recharge code (non-USDT)
+      if (state.step === "deposit_recharge_code" && msg.text) {
+        const rechargeCode = msg.text.replace(/[-\s]/g, "").trim();
+        if (!rechargeCode || rechargeCode.length < 3) {
+          return bot.sendMessage(chatId, "❌ الرقم غير صحيح. أرسل رقم التعبئة بدون فوارز:");
+        }
+        setState(telegramId, { step: "deposit_screenshot", amount: state.amount, methodId: state.methodId, rechargeCode });
+        return bot.sendMessage(
+          chatId,
+          `✅ رقم التعبئة: *${rechargeCode}*\n\nالآن أرسل *سكرين شوت* لعملية التحويل:`,
+          { parse_mode: "Markdown" }
+        );
       }
 
       // Deposit screenshot
@@ -2370,6 +2411,7 @@ export function initBot(): TelegramBot {
 
         const photo = msg.photo[msg.photo.length - 1];
         const method = await storage.getPaymentMethod(state.methodId);
+        const rechargeCode = state.rechargeCode || null;
 
         const deposit = await storage.createDeposit({
           userId: user.id,
@@ -2377,6 +2419,7 @@ export function initBot(): TelegramBot {
           method: method?.name || "unknown",
           status: "pending",
           screenshotFileId: photo.file_id,
+          adminNote: rechargeCode ? `رقم التعبئة: ${rechargeCode}` : null,
         });
 
         await bot.sendMessage(
@@ -2384,6 +2427,7 @@ export function initBot(): TelegramBot {
           `✅ *تم إرسال طلب الإيداع بنجاح!*\n\n` +
           `المبلغ: ${formatNumber(state.amount)} IQD\n` +
           `الطريقة: ${method?.name}\n` +
+          (rechargeCode ? `رقم التعبئة: ${rechargeCode}\n` : ``) +
           `رقم العملية: #${deposit.id}\n\n` +
           `سيتم مراجعة طلبك قريباً.`,
           { parse_mode: "Markdown" }
@@ -2396,7 +2440,8 @@ export function initBot(): TelegramBot {
             `🆔 الآيدي: ${user.telegramId}\n` +
             `📱 اليوزر: ${user.username ? "@" + user.username : "غير محدد"}\n` +
             `💵 المبلغ: ${formatNumber(state.amount)} IQD\n` +
-            `💳 الطريقة: ${method?.name}`;
+            `💳 الطريقة: ${method?.name}` +
+            (rechargeCode ? `\n🔢 رقم التعبئة: ${rechargeCode}` : ``);
 
           await bot.sendPhoto(depositGroupId, photo.file_id, {
             caption,
