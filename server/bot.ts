@@ -88,7 +88,7 @@ async function sendMainMenu(chatId: number, messageId?: number) {
       [{ text: "الخدمات", callback_data: "services", style: "primary", icon_custom_emoji_id: "5312361253610475399" }],
       [{ text: "معلومات حسابك", callback_data: "account_info", style: "primary", icon_custom_emoji_id: "5373012449597335010" }, { text: "شحن حسابك", callback_data: "deposit", style: "primary", icon_custom_emoji_id: "5879991085001871624" }],
       [{ text: "طلباتي", callback_data: "my_orders", style: "primary", icon_custom_emoji_id: "5350387571199319521" }],
-      [{ text: "مراسلة الدعم 📩", url: "https://t.me/lalll" }],
+      [{ text: "مراسلة الدعم", callback_data: "contact_support", style: "primary", icon_custom_emoji_id: "5472107610087889157" }],
     ] as any,
   };
 
@@ -1572,6 +1572,20 @@ export function initBot(): TelegramBot {
       if (data === "my_orders") {
         clearState(telegramId);
         return showMyOrders(chatId, telegramId, messageId);
+      }
+
+      if (data === "contact_support") {
+        return bot.editMessageText("📩 *مراسلة الدعم*\n\nللتواصل مع فريق الدعم اضغط على الزر أدناه:", {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "مراسلة الدعم 📩", url: "https://t.me/lalll" }],
+              [{ text: "القائمة الرئيسية", callback_data: "main_menu", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+            ] as any,
+          },
+        });
       }
 
       // Category services
