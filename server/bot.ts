@@ -157,19 +157,22 @@ async function showServiceTypeCategories(chatId: number, type: string, messageId
   });
   buttons.push([{ text: "رجوع", callback_data: "services", style: "danger", icon_custom_emoji_id: "5875082500023258804" }]);
 
-  const title = type === "smm" ? "📱 *أقسام سوشل ميديا:*" : "📺 *أقسام الاشتراكات:*";
+  const title = type === "smm"
+    ? "![📱](tg://emoji?id=5895428924040548238) *أقسام سوشل ميديا:*"
+    : "📺 *أقسام الاشتراكات:*";
   const catKeyboard = { inline_keyboard: buttons };
 
+  const parseMode = type === "smm" ? "MarkdownV2" : "Markdown";
   if (messageId) {
     await bot.editMessageText(title, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: "Markdown",
+      parse_mode: parseMode,
       reply_markup: catKeyboard,
     });
   } else {
     await bot.sendMessage(chatId, title, {
-      parse_mode: "Markdown",
+      parse_mode: parseMode,
       reply_markup: catKeyboard,
     });
   }
