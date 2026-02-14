@@ -88,7 +88,7 @@ async function sendMainMenu(chatId: number, messageId?: number) {
       [{ text: "الخدمات", callback_data: "services", style: "primary", icon_custom_emoji_id: "5312361253610475399" }],
       [{ text: "معلومات حسابك", callback_data: "account_info", style: "primary", icon_custom_emoji_id: "5373012449597335010" }, { text: "شحن حسابك", callback_data: "deposit", style: "primary", icon_custom_emoji_id: "5879991085001871624" }],
       [{ text: "طلباتي", callback_data: "my_orders", style: "primary", icon_custom_emoji_id: "5350387571199319521" }],
-      [{ text: "مراسلة الدعم 📩", url: "tg://user?id=977560967" }],
+      [{ text: "مراسلة الدعم 📩", url: "tg://user?id=977560967", style: "success" }],
     ] as any,
   };
 
