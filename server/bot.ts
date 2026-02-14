@@ -423,8 +423,15 @@ async function showPaymentMethod(chatId: number, methodId: number, telegramId: s
       [
         { text: "مبلغ اختياري", callback_data: `custom_amount_${methodId}`, style: "success" },
       ],
-      [{ text: "رجوع ↩", callback_data: "deposit", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
     ];
+    if (method.slug === "asiacell") {
+      buttons.push([
+        { text: "شحن عن طريق الكارتات", callback_data: `asiacell_card_${methodId}`, style: "success" },
+      ]);
+    }
+    buttons.push(
+      [{ text: "رجوع ↩", callback_data: "deposit", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+    );
   }
 
   clearState(telegramId);
@@ -1568,6 +1575,15 @@ export function initBot(): TelegramBot {
         return showPaymentMethod(chatId, methodId, telegramId, messageId);
       }
 
+      // AsiaCell card charge button
+      if (data.startsWith("asiacell_card_")) {
+        const methodId = parseInt(data.split("_")[2]);
+        setState(telegramId, { step: "asiacell_card_amount", methodId });
+        return bot.sendMessage(chatId, "💳 أرسل مبلغ الكارت (بالدينار العراقي):", {
+          parse_mode: "Markdown",
+        });
+      }
+
       // Custom amount button
       if (data.startsWith("custom_amount_")) {
         const methodId = parseInt(data.split("_")[2]);
@@ -2425,6 +2441,75 @@ export function initBot(): TelegramBot {
             },
           }
         );
+      }
+
+      // AsiaCell card - enter amount
+      if (state.step === "asiacell_card_amount" && msg.text) {
+        const amount = parseInt(msg.text.replace(/,/g, ""));
+        if (isNaN(amount) || amount < 250) {
+          return bot.sendMessage(chatId, "❌ المبلغ غير صحيح. أدخل مبلغ صحيح بالدينار العراقي");
+        }
+        setState(telegramId, { step: "asiacell_card_number", amount, methodId: state.methodId });
+        return bot.sendMessage(chatId, `✅ مبلغ الكارت: *${formatNumber(amount)} IQD*\n\nالآن أرسل رقم الكارت:`, {
+          parse_mode: "Markdown",
+        });
+      }
+
+      // AsiaCell card - enter card number
+      if (state.step === "asiacell_card_number" && msg.text) {
+        const cardNumber = msg.text.replace(/[-\s]/g, "").trim();
+        if (!cardNumber || cardNumber.length < 5) {
+          return bot.sendMessage(chatId, "❌ رقم الكارت غير صحيح. أرسل رقم الكارت:");
+        }
+        const user = await storage.getUserByTelegramId(telegramId);
+        if (!user) return;
+
+        const method = await storage.getPaymentMethod(state.methodId);
+        const deposit = await storage.createDeposit({
+          userId: user.id,
+          amount: state.amount.toString(),
+          method: "آسياسيل - كارت",
+          status: "pending",
+          screenshotFileId: null,
+          adminNote: `رقم الكارت: ${cardNumber}`,
+        });
+
+        await bot.sendMessage(
+          chatId,
+          `✅ *تم إرسال طلب الشحن بنجاح!*\n\n` +
+          `المبلغ: ${formatNumber(state.amount)} IQD\n` +
+          `الطريقة: آسياسيل - كارت\n` +
+          `رقم الكارت: ${cardNumber}\n` +
+          `رقم العملية: #${deposit.id}\n\n` +
+          `سيتم مراجعة طلبك قريباً.`,
+          { parse_mode: "Markdown" }
+        );
+
+        if (depositGroupId) {
+          const caption = `💰 *طلب شحن كارت آسياسيل #${deposit.id}*\n\n` +
+            `👤 الاسم: ${user.firstName || ""} ${user.lastName || ""}\n` +
+            `🆔 الآيدي: ${user.telegramId}\n` +
+            `📱 اليوزر: ${user.username ? "@" + user.username : "غير محدد"}\n` +
+            `💵 المبلغ: ${formatNumber(state.amount)} IQD\n` +
+            `💳 الطريقة: آسياسيل - كارت\n` +
+            `🔢 رقم الكارت: ${cardNumber}`;
+
+          await bot.sendMessage(depositGroupId, caption, {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: `👤 ${user.firstName || user.telegramId}`, url: `tg://user?id=${user.telegramId}`, style: "primary" }],
+                [
+                  { text: "✅ تأكيد التعبئة", callback_data: `approve_deposit_${deposit.id}`, style: "success" },
+                  { text: "❌ رفض التعبئة", callback_data: `reject_deposit_${deposit.id}`, style: "danger" },
+                ],
+              ] as any,
+            },
+          });
+        }
+
+        clearState(telegramId);
+        return;
       }
 
       // Custom deposit amount
