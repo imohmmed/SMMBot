@@ -68,14 +68,24 @@ export async function getBalance(provider: Provider): Promise<SMMBalanceResult> 
 }
 
 export async function getServices(provider: Provider): Promise<SMMService[]> {
+  const config = getConfig(provider);
+  console.log(`[getServices] Provider: ${provider}, URL: ${config.url}, Key: ${config.key ? config.key.substring(0, 5) + '...' : 'MISSING'}`);
   const result = await apiCall(provider, { action: "services" });
+  console.log(`[getServices] Result type: ${typeof result}, isArray: ${Array.isArray(result)}, length: ${Array.isArray(result) ? result.length : 'N/A'}`);
+  if (!Array.isArray(result)) {
+    console.log(`[getServices] Non-array result:`, JSON.stringify(result).substring(0, 200));
+  }
   if (Array.isArray(result)) return result;
   return [];
 }
 
 export async function getServiceInfo(provider: Provider, serviceId: number): Promise<SMMService | null> {
+  console.log(`[getServiceInfo] Looking for service ${serviceId} on ${provider}`);
   const allServices = await getServices(provider);
-  return allServices.find(s => Number(s.service) === Number(serviceId)) || null;
+  console.log(`[getServiceInfo] Got ${allServices.length} services from ${provider}`);
+  const found = allServices.find(s => Number(s.service) === Number(serviceId));
+  console.log(`[getServiceInfo] Found: ${found ? 'YES - ' + found.name : 'NO'}`);
+  return found || null;
 }
 
 export async function placeOrder(
