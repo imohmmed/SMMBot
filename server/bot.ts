@@ -589,11 +589,8 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
   };
 
   const displayId = getOrderDisplayId(order);
-  const providerLabel = order.provider === "kd1s" ? "kd1s.com" : order.provider === "amazing" ? "amazingsmm.com" : "خدمة يدوية";
-
   let text = `📦 تفاصيل الطلب #${displayId}\n\n` +
-    `📋 الخدمة: ${svc?.name || "غير معروف"}\n` +
-    `🌐 المزود: ${providerLabel}\n`;
+    `📋 الخدمة: ${svc?.name || "غير معروف"}\n`;
 
   if (order.link !== "اشتراك") {
     text += `🔗 الرابط: ${order.link}\n`;
@@ -605,8 +602,6 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
 
   if (startCount) text += `🔢 العدد الابتدائي: ${formatNumber(parseInt(startCount) || 0)}\n`;
   if (remains) text += `📉 المتبقي: ${formatNumber(parseInt(remains) || 0)}\n`;
-  if (charge) text += `💰 التكلفة من المزود: ${charge} ${currency}\n`;
-
   text += `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
 
   if (order.providerOrderId) {
