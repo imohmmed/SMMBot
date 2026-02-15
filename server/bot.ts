@@ -616,7 +616,7 @@ async function showAdminPanel(chatId: number, messageId?: number) {
     [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories", style: "primary" }],
     [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service", style: "success" }, { text: "✏️ تعديل", callback_data: "admin_edit_services", style: "primary" }, { text: "🗑 حذف", callback_data: "admin_delete_services", style: "danger" }],
     [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin", style: "primary" }, { text: "💳 طرق الدفع", callback_data: "admin_payments", style: "primary" }],
-    [{ text: "انشاء كودات", callback_data: "admin_codes", style: "success" }, { text: "خصم رصيد", callback_data: "admin_deduct_balance", style: "danger" }],
+    [{ text: "انشاء كودات", callback_data: "admin_codes", style: "success" }, { text: "خصم رصيد", callback_data: "admin_deduct_balance", style: "danger" }, { text: "كشف حساب", callback_data: "admin_account_check", style: "primary" }],
     [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups", style: "primary" }],
   ];
 
@@ -1747,6 +1747,18 @@ export function initBot(): TelegramBot {
         });
       }
 
+      if (data === "admin_account_check") {
+        setState(telegramId, { step: "account_check_id" });
+        return bot.editMessageText("📋 *كشف حساب*\n\nأرسل آيدي المستخدم (Telegram ID):", {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+          },
+        });
+      }
+
       if (data === "code_money") {
         setState(telegramId, { step: "code_money_amount" });
         return bot.editMessageText("💰 *كود أموال*\n\nأدخل المبلغ المطلوب (IQD):", {
@@ -2467,6 +2479,70 @@ export function initBot(): TelegramBot {
             },
           }
         );
+      }
+
+      // Account check - user ID step
+      if (state.step === "account_check_id" && msg.text) {
+        const targetTelegramId = msg.text.trim();
+        const targetUser = await storage.getUserByTelegramId(targetTelegramId);
+        if (!targetUser) {
+          return bot.sendMessage(chatId, "❌ المستخدم غير موجود. تأكد من الآيدي وحاول مرة أخرى.", {
+            reply_markup: {
+              inline_keyboard: [[{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+            },
+          });
+        }
+        clearState(telegramId);
+
+        const orders = await storage.getOrdersByUser(targetUser.id);
+        const deposits = await storage.getDepositsByUser(targetUser.id);
+        const transactions = await storage.getTransactionsByUser(targetUser.id);
+
+        const approvedDeposits = deposits.filter(d => d.status === "approved");
+        const totalDeposited = approvedDeposits.reduce((sum, d) => sum + parseFloat(d.amount), 0);
+        const totalOrders = orders.length;
+        const totalSpent = orders.reduce((sum, o) => sum + parseFloat(o.totalPrice), 0);
+        const pendingOrders = orders.filter(o => o.status === "pending").length;
+        const completedOrders = orders.filter(o => o.status === "completed").length;
+        const cancelledOrders = orders.filter(o => o.status === "cancelled" || o.status === "refunded").length;
+
+        const lastOrders = orders.slice(-5).reverse();
+        let ordersText = "";
+        if (lastOrders.length > 0) {
+          ordersText = "\n\n📦 *آخر 5 طلبات:*\n";
+          for (const o of lastOrders) {
+            const displayId = o.providerOrderId || o.sequentialId || o.id;
+            const statusEmoji = o.status === "completed" ? "✅" : o.status === "pending" ? "⏳" : o.status === "processing" ? "🔄" : "❌";
+            ordersText += `${statusEmoji} #${displayId} - ${formatNumber(parseFloat(o.totalPrice))} IQD\n`;
+          }
+        }
+
+        const report =
+          `📋 *كشف حساب*\n\n` +
+          `👤 الاسم: ${targetUser.firstName || ""} ${targetUser.lastName || ""}\n` +
+          `🆔 الآيدي: ${targetUser.telegramId}\n` +
+          `📱 اليوزر: ${targetUser.username ? "@" + targetUser.username : "لا يوجد"}\n` +
+          `🏷 الخصم: ${targetUser.discount || 0}%\n` +
+          `👑 الصلاحية: ${targetUser.role === "admin" ? "أدمن" : "مستخدم"}\n\n` +
+          `💰 *الرصيد الحالي:* ${formatNumber(parseFloat(targetUser.balance))} IQD\n` +
+          `💳 *إجمالي الشحن:* ${formatNumber(totalDeposited)} IQD\n` +
+          `🛒 *إجمالي المصروف:* ${formatNumber(totalSpent)} IQD\n\n` +
+          `📊 *الطلبات:* ${totalOrders}\n` +
+          `   ✅ مكتملة: ${completedOrders}\n` +
+          `   ⏳ قيد التنفيذ: ${pendingOrders}\n` +
+          `   ❌ ملغية/مسترجعة: ${cancelledOrders}\n` +
+          `💸 *عمليات الشحن:* ${deposits.length} (${approvedDeposits.length} مقبولة)` +
+          ordersText;
+
+        return bot.sendMessage(chatId, report, {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "كشف حساب آخر", callback_data: "admin_account_check", style: "primary" }],
+              [{ text: "لوحة الإدارة", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+            ] as any,
+          },
+        });
       }
 
       // Deduct balance - user ID step
