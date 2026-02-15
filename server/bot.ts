@@ -616,7 +616,7 @@ async function showAdminPanel(chatId: number, messageId?: number) {
     [{ text: "📂 إدارة الأقسام", callback_data: "admin_categories", style: "primary" }],
     [{ text: "➕ إضافة خدمة", callback_data: "admin_add_service", style: "success" }, { text: "✏️ تعديل", callback_data: "admin_edit_services", style: "primary" }, { text: "🗑 حذف", callback_data: "admin_delete_services", style: "danger" }],
     [{ text: "💹 نسبة الأرباح", callback_data: "admin_margin", style: "primary" }, { text: "💳 طرق الدفع", callback_data: "admin_payments", style: "primary" }],
-    [{ text: "انشاء كودات", callback_data: "admin_codes", style: "success" }],
+    [{ text: "انشاء كودات", callback_data: "admin_codes", style: "success" }, { text: "خصم رصيد", callback_data: "admin_deduct_balance", style: "danger" }],
     [{ text: "⚙️ إعدادات الكروبات", callback_data: "admin_groups", style: "primary" }],
   ];
 
@@ -1735,6 +1735,18 @@ export function initBot(): TelegramBot {
       if (data === "manage_discounts") return showManageDiscounts(chatId, messageId);
       if (data === "admin_admins") return showAdminAdmins(chatId, messageId);
 
+      if (data === "admin_deduct_balance") {
+        setState(telegramId, { step: "deduct_user_id" });
+        return bot.editMessageText("🔻 *خصم رصيد*\n\nأرسل آيدي المستخدم (Telegram ID):", {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+          },
+        });
+      }
+
       if (data === "code_money") {
         setState(telegramId, { step: "code_money_amount" });
         return bot.editMessageText("💰 *كود أموال*\n\nأدخل المبلغ المطلوب (IQD):", {
@@ -2450,6 +2462,71 @@ export function initBot(): TelegramBot {
             reply_markup: {
               inline_keyboard: [
                 [{ text: "إنشاء كود آخر", callback_data: "admin_codes", style: "success" }],
+                [{ text: "لوحة الإدارة", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
+              ] as any,
+            },
+          }
+        );
+      }
+
+      // Deduct balance - user ID step
+      if (state.step === "deduct_user_id" && msg.text) {
+        const targetTelegramId = msg.text.trim();
+        const targetUser = await storage.getUserByTelegramId(targetTelegramId);
+        if (!targetUser) {
+          return bot.sendMessage(chatId, "❌ المستخدم غير موجود. تأكد من الآيدي وحاول مرة أخرى.", {
+            reply_markup: {
+              inline_keyboard: [[{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+            },
+          });
+        }
+        setState(telegramId, { step: "deduct_amount", targetUserId: targetUser.id, targetTelegramId });
+        return bot.sendMessage(
+          chatId,
+          `👤 المستخدم: ${targetUser.firstName || ""}\n💰 الرصيد الحالي: ${formatNumber(parseFloat(targetUser.balance))} IQD\n\nأدخل المبلغ المراد خصمه (بدون فارزة):`,
+          {
+            reply_markup: {
+              inline_keyboard: [[{ text: "رجوع", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any],
+            },
+          }
+        );
+      }
+
+      // Deduct balance - amount step
+      if (state.step === "deduct_amount" && msg.text) {
+        const amount = parseInt(msg.text.trim());
+        if (isNaN(amount) || amount < 1) {
+          return bot.sendMessage(chatId, "❌ المبلغ غير صحيح.");
+        }
+        const targetUser = await storage.getUser(state.targetUserId);
+        if (!targetUser) {
+          clearState(telegramId);
+          return bot.sendMessage(chatId, "❌ المستخدم غير موجود.");
+        }
+        const currentBalance = parseFloat(targetUser.balance);
+        if (amount > currentBalance) {
+          return bot.sendMessage(chatId, `❌ المبلغ أكبر من رصيد المستخدم (${formatNumber(currentBalance)} IQD).`);
+        }
+        await storage.updateUserBalance(targetUser.id, (-amount).toString());
+        await storage.createTransaction({
+          userId: targetUser.id,
+          type: "withdrawal",
+          amount: (-amount).toString(),
+          description: `خصم رصيد من الإدارة - ${formatNumber(amount)} IQD`,
+        });
+        clearState(telegramId);
+        const newBalance = currentBalance - amount;
+        return bot.sendMessage(
+          chatId,
+          `✅ *تم خصم الرصيد بنجاح*\n\n` +
+          `👤 المستخدم: ${targetUser.firstName || ""}\n` +
+          `🔻 المبلغ المخصوم: ${formatNumber(amount)} IQD\n` +
+          `💰 الرصيد الجديد: ${formatNumber(newBalance)} IQD`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "خصم رصيد آخر", callback_data: "admin_deduct_balance", style: "danger" }],
                 [{ text: "لوحة الإدارة", callback_data: "admin_panel", style: "danger", icon_custom_emoji_id: "5875082500023258804" }],
               ] as any,
             },
