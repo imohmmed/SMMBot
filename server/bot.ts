@@ -81,8 +81,10 @@ function calculatePrice(rate: string, quantity: number, margin: number): number 
   return basePrice * (1 + margin / 100);
 }
 
-async function sendMainMenu(chatId: number, messageId?: number) {
-  const text = "![🌟](tg://emoji?id=5287640096164564000) *مرحباً بك في بوت خدمات السوشل ميديا*\n\nاختر من القائمة أدناه:";
+async function sendMainMenu(chatId: number, messageId?: number, firstName?: string) {
+  const name = firstName ? firstName : "";
+  const escapedName = name.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+  const text = `![🌟](tg://emoji?id=5287640096164564000) *اهلاً بك ${escapedName}، في بوت الخدمات*\n\nاختر من القائمة ادناه :`;
   const keyboard = {
     inline_keyboard: [
       [{ text: "الخدمات", callback_data: "services", style: "primary", icon_custom_emoji_id: "5312361253610475399" }],
@@ -1248,7 +1250,7 @@ export function initBot(): TelegramBot {
       }
     }
 
-    await sendMainMenu(chatId);
+    await sendMainMenu(chatId, undefined, msg.from?.first_name);
   });
 
   // /admin command
@@ -1310,7 +1312,7 @@ export function initBot(): TelegramBot {
       // Main menu
       if (data === "main_menu") {
         clearState(telegramId);
-        return sendMainMenu(chatId, messageId);
+        return sendMainMenu(chatId, messageId, query.from.first_name);
       }
 
       if (data === "confirm_order") {
