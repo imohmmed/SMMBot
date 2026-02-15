@@ -3,40 +3,36 @@ import { storage } from "./storage";
 export async function seedDatabase() {
   try {
     const existingCategories = await storage.getCategories();
-    if (existingCategories.length > 0) return;
-
-    console.log("Seeding database...");
-
-    // Create default categories
-    const categories = [
-      { name: "انستاكرام", slug: "instagram", sortOrder: 1, isActive: true },
-      { name: "يوتيوب", slug: "youtube", sortOrder: 2, isActive: true },
-      { name: "فيسبوك", slug: "facebook", sortOrder: 3, isActive: true },
-      { name: "تيك توك", slug: "tiktok", sortOrder: 4, isActive: true },
-      { name: "تويتر", slug: "twitter", sortOrder: 5, isActive: true },
-      { name: "تيليكرام", slug: "telegram", sortOrder: 6, isActive: true },
-    ];
-
-    for (const cat of categories) {
-      await storage.createCategory(cat);
+    if (existingCategories.length === 0) {
+      console.log("Seeding categories...");
+      const categories = [
+        { name: "انستاكرام", slug: "instagram", sortOrder: 1, isActive: true },
+        { name: "يوتيوب", slug: "youtube", sortOrder: 2, isActive: true },
+        { name: "فيسبوك", slug: "facebook", sortOrder: 3, isActive: true },
+        { name: "تيك توك", slug: "tiktok", sortOrder: 4, isActive: true },
+        { name: "تويتر", slug: "twitter", sortOrder: 5, isActive: true },
+        { name: "تيليكرام", slug: "telegram", sortOrder: 6, isActive: true },
+      ];
+      for (const cat of categories) {
+        await storage.createCategory(cat);
+      }
+      await storage.setSetting("profit_margin", "15");
     }
 
-    // Set default profit margin
-    await storage.setSetting("profit_margin", "15");
-
-    // Create default payment methods
-    const paymentMethods = [
-      { name: "USDT", slug: "usdt", instructions: "قم بالتحويل إلى العنوان التالي:\n\nTRC20: TXxxxxxxxxxxxxx\n\nبعد التحويل أرسل سكرين شوت", isActive: true },
-      { name: "ماستر كارد", slug: "mastercard", instructions: "قم بالتحويل إلى الحساب التالي:\n\nرقم البطاقة: xxxx-xxxx-xxxx\n\nبعد التحويل أرسل سكرين شوت", isActive: true },
-      { name: "آسياسيل", slug: "asiacell", instructions: "قم بالتحويل عبر آسياسيل موني إلى الرقم:\n\n07xxxxxxxxx\n\nبعد التحويل أرسل سكرين شوت", isActive: true },
-      { name: "زين كاش", slug: "zaincash", instructions: "قم بالتحويل عبر زين كاش إلى الرقم:\n\n07xxxxxxxxx\n\nبعد التحويل أرسل سكرين شوت", isActive: true },
-    ];
-
-    for (const method of paymentMethods) {
-      await storage.createPaymentMethod(method);
+    const existingMethods = await storage.getPaymentMethods();
+    if (existingMethods.length === 0) {
+      console.log("Seeding payment methods...");
+      const paymentMethods = [
+        { name: "USDT", slug: "usdt", instructions: "قم بالتحويل إلى العنوان التالي:\n\nTRC20: TGVFZoyTLzH7cs6mTKGP88rNpVKMFPWDpU\n\nبعد التحويل أرسل سكرين شوت", isActive: true },
+        { name: "ماستر كارد", slug: "mastercard", instructions: "قم بالتحويل إلى الحساب التالي:\n\n7118349435\nبأسم محمد هيثم\n\nبعد التحويل أرسل سكرين شوت", isActive: true },
+        { name: "زين كاش", slug: "zaincash", instructions: "قم بالتحويل عبر زين كاش إلى الرقم:\n\n07827243017\n\nبعد التحويل أرسل سكرين شوت", isActive: true },
+        { name: "آسيا سيل", slug: "asiacell", instructions: "شحن بطاقة آسيا سيل إلى الرقم:\n\n07707727775", isActive: true },
+      ];
+      for (const method of paymentMethods) {
+        await storage.createPaymentMethod(method);
+      }
     }
 
-    // Set creator as admin
     const creatorId = process.env.CREATOR_TELEGRAM_ID || "1384026800";
     const existingCreator = await storage.getUserByTelegramId(creatorId);
     if (!existingCreator) {
