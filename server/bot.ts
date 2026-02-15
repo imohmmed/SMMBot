@@ -513,6 +513,11 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
   const svc = await storage.getService(order.serviceId);
 
   let providerStatus = order.status;
+  let startCount = "";
+  let remains = "";
+  let charge = "";
+  let currency = "";
+
   if (order.providerOrderId) {
     try {
       const statusResult = await smmApi.getOrderStatus(
@@ -521,6 +526,11 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
       );
       if (statusResult.status) {
         providerStatus = statusResult.status;
+        startCount = statusResult.start_count || "";
+        remains = statusResult.remains || "";
+        charge = statusResult.charge || "";
+        currency = statusResult.currency || "";
+
         if (providerStatus.toLowerCase() === "canceled" || providerStatus.toLowerCase() === "cancelled" || providerStatus.toLowerCase() === "refunded") {
           if (order.status !== "cancelled" && order.status !== "refunded") {
             await storage.updateOrderStatus(order.id, "cancelled");
@@ -538,15 +548,13 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
 
               await bot.sendMessage(
                 parseInt(user.telegramId),
-                `🔄 *تم إلغاء الطلب #${refundDisplayId}*\n\nتم إرجاع المبلغ ${formatNumber(order.amount)} IQD إلى رصيدك.`,
-                { parse_mode: "Markdown" }
+                `🔄 تم إلغاء الطلب #${refundDisplayId}\n\nتم إرجاع المبلغ ${formatNumber(order.amount)} IQD إلى رصيدك.`
               );
 
               if (notificationGroupId) {
                 await bot.sendMessage(
                   notificationGroupId,
-                  `🔄 *تم إلغاء الطلب #${refundDisplayId}*\nالمستخدم: ${user.firstName || ""} (${user.telegramId})\nالمبلغ المسترجع: ${formatNumber(order.amount)} IQD`,
-                  { parse_mode: "Markdown" }
+                  `🔄 تم إلغاء الطلب #${refundDisplayId}\nالمستخدم: ${user.firstName || ""} (${user.telegramId})\nالمبلغ المسترجع: ${formatNumber(order.amount)} IQD`
                 );
               }
             }
@@ -581,13 +589,29 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
   };
 
   const displayId = getOrderDisplayId(order);
-  const text = `📦 *تفاصيل الطلب #${displayId}*\n\n` +
+  const providerLabel = order.provider === "kd1s" ? "kd1s.com" : order.provider === "amazing" ? "amazingsmm.com" : "خدمة يدوية";
+
+  let text = `📦 تفاصيل الطلب #${displayId}\n\n` +
     `📋 الخدمة: ${svc?.name || "غير معروف"}\n` +
-    `${order.link !== "اشتراك" ? `🔗 الرابط: ${order.link}\n` : ""}` +
-    `📊 الكمية: ${formatNumber(order.quantity)}\n` +
+    `🌐 المزود: ${providerLabel}\n`;
+
+  if (order.link !== "اشتراك") {
+    text += `🔗 الرابط: ${order.link}\n`;
+  }
+
+  text += `📊 الكمية: ${formatNumber(order.quantity)}\n` +
     `💵 المبلغ: ${formatNumber(order.amount)} IQD\n` +
-    `📌 الحالة: ${statusMap[providerStatus] || providerStatus}\n` +
-    `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
+    `📌 الحالة: ${statusMap[providerStatus] || providerStatus}\n`;
+
+  if (startCount) text += `🔢 العدد الابتدائي: ${formatNumber(parseInt(startCount) || 0)}\n`;
+  if (remains) text += `📉 المتبقي: ${formatNumber(parseInt(remains) || 0)}\n`;
+  if (charge) text += `💰 التكلفة من المزود: ${charge} ${currency}\n`;
+
+  text += `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
+
+  if (order.providerOrderId) {
+    text += `\n🔑 رقم الطلب عند المزود: ${order.providerOrderId}`;
+  }
 
   const keyboard = { inline_keyboard: [[{ text: "رجوع للطلبات", callback_data: "my_orders", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any] };
 
@@ -595,12 +619,10 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: "Markdown",
       reply_markup: keyboard,
     });
   } else {
     await bot.sendMessage(chatId, text, {
-      parse_mode: "Markdown",
       reply_markup: keyboard,
     });
   }
