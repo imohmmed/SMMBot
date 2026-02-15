@@ -603,10 +603,7 @@ async function showOrderDetail(chatId: number, orderId: number, messageId?: numb
   if (startCount) text += `🔢 العدد الابتدائي: ${formatNumber(parseInt(startCount) || 0)}\n`;
   if (remains) text += `📉 المتبقي: ${formatNumber(parseInt(remains) || 0)}\n`;
   text += `📅 التاريخ: ${order.createdAt.toLocaleDateString("ar-IQ")}`;
-
-  if (order.providerOrderId) {
-    text += `\n🔑 رقم الطلب عند المزود: ${order.providerOrderId}`;
-  }
+  text += `\n\n­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­`;
 
   const keyboard = { inline_keyboard: [[{ text: "رجوع للطلبات", callback_data: "my_orders", style: "danger", icon_custom_emoji_id: "5875082500023258804" }] as any] };
 
