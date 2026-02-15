@@ -75,7 +75,7 @@ export async function getServices(provider: Provider): Promise<SMMService[]> {
 
 export async function getServiceInfo(provider: Provider, serviceId: number): Promise<SMMService | null> {
   const allServices = await getServices(provider);
-  return allServices.find(s => s.service === serviceId) || null;
+  return allServices.find(s => Number(s.service) === Number(serviceId)) || null;
 }
 
 export async function placeOrder(
