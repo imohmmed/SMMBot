@@ -2395,7 +2395,7 @@ export function initBot(): TelegramBot {
 
         setState(telegramId, { ...state, step: "order_confirm", quantity, price, cost });
 
-        let confirmText = `📋 *تأكيد الطلب*\n\n` +
+        let confirmText = `📋 تأكيد الطلب\n\n` +
           `🔹 الخدمة: ${svc.name}\n` +
           `🔗 الرابط: ${state.link}\n` +
           `📊 الكمية: ${formatNumber(quantity)}\n`;
@@ -2413,7 +2413,6 @@ export function initBot(): TelegramBot {
           chatId,
           confirmText,
           {
-            parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
                 [
